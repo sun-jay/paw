@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
+import { parse as parseYaml } from "yaml";
 
 const ROOT_DIR = resolve(import.meta.dir, "../..");
 const SKILLS_DIR = resolve(import.meta.dir, "..");
@@ -31,7 +32,7 @@ function loadEnv(): void {
 }
 
 // ---------------------------------------------------------------------------
-// YAML frontmatter parser (no dependencies)
+// YAML frontmatter parser
 // ---------------------------------------------------------------------------
 
 interface SkillFrontmatter {
@@ -60,7 +61,7 @@ function parseSkillMd(skillName: string): ParsedSkill {
   }
 
   const [, yamlBlock, body] = fmMatch;
-  const frontmatter = parseSimpleYaml(yamlBlock!) as unknown as SkillFrontmatter;
+  const frontmatter = parseYaml(yamlBlock!) as SkillFrontmatter;
 
   if (!frontmatter.name) throw new Error(`skill.md for ${skillName} missing 'name'`);
   if (frontmatter.version === undefined) throw new Error(`skill.md for ${skillName} missing 'version'`);
@@ -68,104 +69,6 @@ function parseSkillMd(skillName: string): ParsedSkill {
   if (!frontmatter.skill_dependencies) frontmatter.skill_dependencies = [];
 
   return { frontmatter, body: body!.trim() };
-}
-
-function parseSimpleYaml(yaml: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  let currentKey: string | null = null;
-  let arrayAccumulator: string[] | null = null;
-  let mapKey: string | null = null;
-  let mapAccumulator: Record<string, string> | null = null;
-
-  const lines = yaml.split("\n");
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    const trimmed = line.trim();
-    const indent = line.length - line.trimStart().length;
-
-    // Continue accumulating array items
-    if (arrayAccumulator !== null && trimmed.startsWith("- ")) {
-      arrayAccumulator.push(trimmed.slice(2).trim());
-      continue;
-    }
-
-    // Flush array if we're no longer in it
-    if (arrayAccumulator !== null && currentKey) {
-      result[currentKey] = arrayAccumulator;
-      arrayAccumulator = null;
-      currentKey = null;
-    }
-
-    // Continue accumulating indented map entries
-    if (mapAccumulator !== null && indent >= 2 && trimmed.includes(":")) {
-      const colonIdx = trimmed.indexOf(":");
-      const k = trimmed.slice(0, colonIdx).trim();
-      const v = trimmed.slice(colonIdx + 1).trim();
-      if (k) mapAccumulator[k] = v;
-      continue;
-    }
-
-    // Flush map if we're no longer in it
-    if (mapAccumulator !== null && mapKey) {
-      result[mapKey] = mapAccumulator;
-      mapAccumulator = null;
-      mapKey = null;
-    }
-
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const colonIdx = trimmed.indexOf(":");
-    if (colonIdx === -1) continue;
-
-    const key = trimmed.slice(0, colonIdx).trim();
-    const rawValue = trimmed.slice(colonIdx + 1).trim();
-
-    if (rawValue === "" || rawValue === "[]") {
-      const nextLine = lines[i + 1];
-      const nextTrimmed = nextLine?.trim();
-      const nextIndent = nextLine ? nextLine.length - nextLine.trimStart().length : 0;
-      if (nextTrimmed?.startsWith("- ") || rawValue === "[]") {
-        currentKey = key;
-        arrayAccumulator = [];
-        if (rawValue === "[]") {
-          result[key] = [];
-          arrayAccumulator = null;
-          currentKey = null;
-        }
-        continue;
-      }
-      // Check if next line is an indented key-value (nested map)
-      if (nextIndent >= 2 && nextTrimmed && nextTrimmed.includes(":")) {
-        mapKey = key;
-        mapAccumulator = {};
-        continue;
-      }
-      result[key] = {};
-      continue;
-    }
-
-    if (rawValue === "null") {
-      result[key] = null;
-    } else if (rawValue === "true") {
-      result[key] = true;
-    } else if (rawValue === "false") {
-      result[key] = false;
-    } else if (/^\d+$/.test(rawValue)) {
-      result[key] = parseInt(rawValue, 10);
-    } else {
-      result[key] = rawValue;
-    }
-  }
-
-  if (arrayAccumulator !== null && currentKey) {
-    result[currentKey] = arrayAccumulator;
-  }
-  if (mapAccumulator !== null && mapKey) {
-    result[mapKey] = mapAccumulator;
-  }
-
-  return result;
 }
 
 // ---------------------------------------------------------------------------
