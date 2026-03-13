@@ -1,0 +1,71 @@
+name: canvas
+version: 1
+secrets:
+  CANVAS_API_TOKEN: op://personal_agent_workspace/Canvas/credential
+skill_dependencies: []
+
+docs: |
+  ## Canvas LMS (bCourses @ UC Berkeley)
+
+  Integration with Canvas LMS REST API for course data, assignments, grades, submissions,
+  announcements, modules, files, and discussions.
+
+  API base: `https://bcourses.berkeley.edu/api/v1`
+  Timezone: America/Los_Angeles
+
+  ### When to use
+
+  Trigger on: school, homework, assignments, due dates, grades, courses, Canvas, bCourses,
+  "what do I have to do", "morning check", "what's due", "plan my week", "weekly check",
+  "course status", "missing submissions", or any mention of specific courses like STAT 135.
+
+  ### Spring 2026 Courses
+
+  | Course                                | Canvas ID  | Code             |
+  |---------------------------------------|------------|------------------|
+  | Concepts of Statistics                 | 1552931    | STAT 135         |
+  | Openness to Opposing Views             | 1551874    | LS 4/104         |
+  | Service Operations Design and Analysis | 1553372    | INDENG 151       |
+  | The Supreme Court & Public Policy      | 1552095    | LS 138           |
+  | Crude Awakening: Oil & Gas Fundamentals| 1553928    | CIVENG 198       |
+
+  ### Functions
+
+  #### Raw (return API JSON)
+
+  - `raw_getProfile()` — authenticated user profile
+  - `raw_getTodo()` — to-do items (upcoming work)
+  - `raw_getUpcomingEvents()` — upcoming events/assignments
+  - `raw_getMissingSubmissions()` — missing/overdue submissions
+  - `raw_getGrades()` — enrollments with grades across all courses
+  - `raw_getCourses()` — list active courses
+  - `raw_getDashboard()` — dashboard cards overview
+  - `raw_getAssignments(courseId)` — list assignments for a course
+  - `raw_getAssignment(courseId, assignmentId)` — single assignment details
+  - `raw_getSubmission(courseId, assignmentId)` — your submission status
+  - `raw_getAnnouncements(courseIds)` — announcements for given courses
+  - `raw_getModules(courseId)` — modules with items
+  - `raw_getFiles(courseId, searchTerm?)` — course files, optional search
+  - `raw_getDiscussionTopics(courseId)` — discussion topics
+
+  #### Readable (return condensed markdown)
+
+  - `readable_myCourses()` — list enrolled courses with IDs
+  - `readable_todo()` — upcoming to-do items with links
+  - `readable_missingSubmissions()` — missing/overdue work with links
+  - `readable_weeklyPlan()` — prioritized weekly plan: assignments, grades, submissions
+  - `readable_dailyBrief()` — daily overview: todo + upcoming + missing + recent announcements
+  - `readable_courseAssignments(courseId)` — assignments for a course with due dates and status
+  - `readable_announcements(courseIds?)` — recent announcements across courses
+
+  ### Link Format
+
+  Assignment links: `https://bcourses.berkeley.edu/courses/{courseId}/assignments/{assignmentId}`
+  Course links: `https://bcourses.berkeley.edu/courses/{courseId}`
+  File viewer links: use `display_url` or HTML URL, NOT direct download URLs.
+
+  ### User Preferences
+
+  - Every actionable item must include a direct, openable link
+  - Dates: convert from UTC to Pacific Time for display
+  - Pagination: always use `per_page=50`, check Link header for `rel="next"`

@@ -1,0 +1,53 @@
+name: edstem
+version: 1
+secrets:
+  ED_API_TOKEN: op://personal_agent_workspace/EdStem/credential
+skill_dependencies: []
+
+docs: |
+  ## EdStem
+
+  Integration with the Ed Discussion (edstem.org) API for reading course threads, announcements, and user activity.
+
+  API base: `https://us.edstem.org/api/`
+  Timezone: America/Los_Angeles
+
+  ### Known Course IDs
+
+  | Course               | Ed ID | Status   |
+  |----------------------|-------|----------|
+  | STAT 135 (Spring 26) | 94278 | Active   |
+  | STAT 134 (Fall 25)   | 84963 | Archived |
+  | Stat 001 community   | 26372 | Active   |
+  | EECS 101             | 23247 | Active   |
+  | STAT 133             | 84260 | Active   |
+
+  ### Functions
+
+  #### Raw (return API JSON)
+
+  - `raw_getUser()` — authenticated user info + all enrolled courses
+  - `raw_getCourse(courseId)` — course details
+  - `raw_listThreads(courseId, opts?)` — list threads with optional limit, offset, sort, filter, category, search
+  - `raw_getThread(threadId)` — full thread by global ID
+  - `raw_getThreadByNumber(courseId, number)` — thread by course-relative number
+  - `raw_createThread(courseId, thread)` — create a new thread
+  - `raw_pinThread(threadId)` — pin a thread
+  - `raw_lockThread(threadId)` — lock a thread
+  - `raw_starThread(threadId)` — star a thread
+  - `raw_endorseThread(threadId)` — endorse a thread
+  - `raw_getUserActivity(userId, opts?)` — user activity feed
+  - `raw_getLessons(courseId)` — course modules/lessons
+  - `raw_getChallenges(courseId)` — course challenges
+  - `raw_getResources(courseId)` — course resources
+
+  #### Readable (return condensed markdown)
+
+  - `readable_myCourses()` — list all enrolled courses
+  - `readable_listThreads(courseId, opts?)` — condensed thread listing with Ed links
+  - `readable_getThread(threadId)` — thread content with answers and comments
+  - `readable_searchThreads(courseId, query)` — search threads, return condensed results with links
+
+  ### Ed Link Format
+
+  Always use: `https://edstem.org/us/courses/{courseId}/discussion/{threadId}` (global thread ID, not number).

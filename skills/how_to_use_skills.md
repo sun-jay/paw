@@ -6,12 +6,12 @@ Call `activate(skillName)` from `skills/secretsmanager/functions.ts`. The skill 
 
 ```typescript
 import { activate } from "./secretsmanager/functions.ts";
-const result = await activate("canvas");
+const result = await activate("myskill");
 console.log(result.summary);
 ```
 
 `activate` does the following in order:
-1. Reads `skills/<skillName>/skill.yml` and parses its YAML frontmatter
+1. Reads `skills/<skillName>/skill.yml` and parses it
 2. Walks `skill_dependencies` recursively (depth-first, deduplicates, detects cycles)
 3. Merges all `secrets` from the full dependency tree
 4. Calls `op read` for each `op://` reference via the secretsmanager and sets `process.env`
@@ -66,20 +66,20 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 
 1. Create the folder: `skills/<skillname>/`
 2. Write `skill.yml` with the frontmatter and docs (see format above)
-3. If the skill needs a secret that doesn't exist yet in 1Password, create it:
+3. **Create the 1Password secret** using `createSecret` from the secretsmanager skill. This is mandatory — never hardcode tokens or skip this step, even during development:
    ```typescript
    import { createSecret } from "./secretsmanager/functions.ts";
-   createSecret("myskill", "token", "the-token-value");
+   createSecret("MySkill", "credential", "the-token-value");
    ```
-   The `op://` reference will be `op://personal_agent_workspace/myskill/token`
+   The `op://` reference in `skill.yml` should match: `op://personal_agent_workspace/MySkill/credential`
 4. Write `functions.ts` with the raw and readable layers
-5. Test by calling `activate("skillname")` and running functions
+5. Test by calling `activate("skillname")` — this resolves secrets from 1Password and imports functions. Never set `process.env` tokens manually, even for testing.
 
 ## Updating a Skill
 
 1. Edit `functions.ts` with the changes
 2. Increment `version` in `skill.yml` frontmatter
-3. Update the function docs in the `skill.yml` markdown body if signatures changed
+3. Update the `docs` field in `skill.yml` if signatures changed
 
 ## Deleting a Skill
 
