@@ -4,7 +4,7 @@ import { join, resolve } from "path";
 
 const ROOT_DIR = resolve(import.meta.dir, "../..");
 const SKILLS_DIR = resolve(import.meta.dir, "..");
-const DEFAULT_VAULT = "claude-agent";
+const DEFAULT_VAULT = "personal_agent_workspace";
 
 loadEnv();
 
