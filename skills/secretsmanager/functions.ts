@@ -2,8 +2,33 @@ import { execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 
-const DEFAULT_VAULT = "claude-agent";
+const ROOT_DIR = resolve(import.meta.dir, "../..");
 const SKILLS_DIR = resolve(import.meta.dir, "..");
+const DEFAULT_VAULT = "claude-agent";
+
+loadEnv();
+
+// ---------------------------------------------------------------------------
+// .env loader (no dependencies)
+// ---------------------------------------------------------------------------
+
+function loadEnv(): void {
+  const envPath = join(ROOT_DIR, ".env");
+  if (!existsSync(envPath)) return;
+
+  const content = readFileSync(envPath, "utf-8");
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // YAML frontmatter parser (no dependencies)
@@ -35,7 +60,7 @@ function parseSkillMd(skillName: string): ParsedSkill {
   }
 
   const [, yamlBlock, body] = fmMatch;
-  const frontmatter = parseSimpleYaml(yamlBlock!) as SkillFrontmatter;
+  const frontmatter = parseSimpleYaml(yamlBlock!) as unknown as SkillFrontmatter;
 
   if (!frontmatter.name) throw new Error(`skill.md for ${skillName} missing 'name'`);
   if (frontmatter.version === undefined) throw new Error(`skill.md for ${skillName} missing 'version'`);
@@ -174,7 +199,7 @@ function checkOpCli(): void {
 
 export function resolveSecrets(secretsMap: Record<string, string>): string[] {
   const entries = Object.entries(secretsMap).filter(
-    ([, ref]) => ref !== "(system env)"
+    ([, ref]) => ref.startsWith("op://")
   );
 
   if (entries.length === 0) return [];

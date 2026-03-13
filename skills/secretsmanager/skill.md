@@ -2,7 +2,7 @@
 name: secretsmanager
 version: 1
 secrets:
-  OP_SERVICE_ACCOUNT_TOKEN: (system env)
+  OP_SERVICE_ACCOUNT_TOKEN: .env
 skill_dependencies: []
 ---
 
@@ -33,4 +33,4 @@ All other skills are activated through this one. It is always loaded first.
 
 - The agent can create and read metadata, never delete or modify existing secrets.
 - User manages deletion/editing through the 1Password app directly.
-- `OP_SERVICE_ACCOUNT_TOKEN` must be set in the system environment before any operations.
+- `OP_SERVICE_ACCOUNT_TOKEN` must be set in the root `.env` file (gitignored). This is the only secret stored locally — everything else lives in 1Password.
