@@ -11,7 +11,7 @@ console.log(result.summary);
 ```
 
 `activate` does the following in order:
-1. Reads `skills/<skillName>/skill.md` and parses its YAML frontmatter
+1. Reads `skills/<skillName>/skill.yml` and parses its YAML frontmatter
 2. Walks `skill_dependencies` recursively (depth-first, deduplicates, detects cycles)
 3. Merges all `secrets` from the full dependency tree
 4. Calls `op read` for each `op://` reference via the secretsmanager and sets `process.env`
@@ -20,30 +20,29 @@ console.log(result.summary);
 
 If a skill has no `functions.ts` yet, it still activates — the summary will note `(no functions.ts yet)`.
 
-## skill.md Format
+## skill.yml Format
 
-Every skill folder must have a `skill.md`. It has two parts: YAML frontmatter and a markdown body.
+Every skill folder must have a `skill.yml`. It is a plain YAML file with config fields and an optional `docs` field for documentation.
 
-```markdown
----
+```yaml
 name: myskill
 version: 1
 secrets:
   MY_TOKEN: op://personal_agent_workspace/myskill/token
 skill_dependencies: []
 schedule: null
----
 
-## My Skill
+docs: |
+  ## My Skill
 
-Description of what this skill does.
+  Description of what this skill does.
 
-### Functions
-- raw_doThing(arg) → returns full API response
-- readable_doThing(arg) → returns condensed markdown
+  ### Functions
+  - raw_doThing(arg) → returns full API response
+  - readable_doThing(arg) → returns condensed markdown
 ```
 
-### Frontmatter Fields
+### Fields
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -52,10 +51,7 @@ Description of what this skill does.
 | `secrets` | Record\<string, string\> | yes | `ENV_VAR: op://ref` pairs. Use `{}` if none. Use `.env` for secrets loaded from the root .env file |
 | `skill_dependencies` | string[] | yes | Skill names this depends on. Use `[]` if none |
 | `schedule` | string \| null | no | Cron expression for scheduled skills |
-
-### Markdown Body
-
-The body documents available functions for agent reference. It is returned as `docs` in the activation result. Write it as if explaining the skill to another agent — what each function does, what it returns, when to use raw vs readable.
+| `docs` | string | no | Markdown documentation for agent reference. Returned as `docs` in the activation result. Write it as if explaining the skill to another agent — what each function does, what it returns, when to use raw vs readable. |
 
 ## functions.ts Format
 
@@ -69,7 +65,7 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 ## Creating a New Skill
 
 1. Create the folder: `skills/<skillname>/`
-2. Write `skill.md` with the frontmatter and docs (see format above)
+2. Write `skill.yml` with the frontmatter and docs (see format above)
 3. If the skill needs a secret that doesn't exist yet in 1Password, create it:
    ```typescript
    import { createSecret } from "./secretsmanager/functions.ts";
@@ -82,8 +78,8 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 ## Updating a Skill
 
 1. Edit `functions.ts` with the changes
-2. Increment `version` in `skill.md` frontmatter
-3. Update the function docs in the `skill.md` markdown body if signatures changed
+2. Increment `version` in `skill.yml` frontmatter
+3. Update the function docs in the `skill.yml` markdown body if signatures changed
 
 ## Deleting a Skill
 
@@ -109,7 +105,7 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 
 - The **only** secret stored locally is `OP_SERVICE_ACCOUNT_TOKEN` in the root `.env` (gitignored)
 - Every other secret lives in the `personal_agent_workspace` vault in 1Password
-- Skills declare which secrets they need in their `skill.md` frontmatter as `ENV_VAR: op://reference` pairs
+- Skills declare which secrets they need in their `skill.yml` frontmatter as `ENV_VAR: op://reference` pairs
 - When `activate` runs, it collects all secrets from the skill + its dependencies, fetches them from 1Password via `op read`, and sets them on `process.env`
 - Skill functions access secrets via `process.env.SECRET_NAME` — they never see `op://` references or raw tokens
 - A skill can only access secrets declared in its own frontmatter or in its dependencies' frontmatter

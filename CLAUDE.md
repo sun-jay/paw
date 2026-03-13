@@ -11,7 +11,7 @@
 
 ## Skills
 
-- Skills live in `skills/<name>/` — each has a `skill.md` (frontmatter + docs) and optional `functions.ts`
+- Skills live in `skills/<name>/` — each has a `skill.yml` (frontmatter + docs) and optional `functions.ts`
 - Read `skills/how_to_use_skills.md` for conventions on creating, activating, and wiring secrets
 - To use a skill: `activate("skillname")` from `skills/secretsmanager/functions.ts`, then import its functions
 - The secretsmanager skill is the bootstrap — it handles activation, dependency resolution, and 1Password secret injection for all other skills

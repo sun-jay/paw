@@ -48,27 +48,22 @@ interface ParsedSkill {
   body: string;
 }
 
-function parseSkillMd(skillName: string): ParsedSkill {
-  const skillPath = join(SKILLS_DIR, skillName, "skill.md");
+function parseSkillConfig(skillName: string): ParsedSkill {
+  const skillPath = join(SKILLS_DIR, skillName, "skill.yml");
   if (!existsSync(skillPath)) {
     throw new Error(`Skill not found: ${skillName} (expected ${skillPath})`);
   }
 
   const content = readFileSync(skillPath, "utf-8");
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!fmMatch) {
-    throw new Error(`Invalid skill.md format for ${skillName}: missing YAML frontmatter`);
-  }
+  const parsed = parseYaml(content) as SkillFrontmatter & { docs?: string };
 
-  const [, yamlBlock, body] = fmMatch;
-  const frontmatter = parseYaml(yamlBlock!) as SkillFrontmatter;
+  if (!parsed.name) throw new Error(`skill.yml for ${skillName} missing 'name'`);
+  if (parsed.version === undefined) throw new Error(`skill.yml for ${skillName} missing 'version'`);
+  if (!parsed.secrets) parsed.secrets = {};
+  if (!parsed.skill_dependencies) parsed.skill_dependencies = [];
 
-  if (!frontmatter.name) throw new Error(`skill.md for ${skillName} missing 'name'`);
-  if (frontmatter.version === undefined) throw new Error(`skill.md for ${skillName} missing 'version'`);
-  if (!frontmatter.secrets) frontmatter.secrets = {};
-  if (!frontmatter.skill_dependencies) frontmatter.skill_dependencies = [];
-
-  return { frontmatter, body: body!.trim() };
+  const { docs, ...frontmatter } = parsed;
+  return { frontmatter, body: (docs ?? "").trim() };
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +87,7 @@ function resolveDependencies(
     throw new Error(`Circular dependency detected: ${[...chain, skillName].join(" → ")}`);
   }
 
-  const { frontmatter, body } = parseSkillMd(skillName);
+  const { frontmatter, body } = parseSkillConfig(skillName);
   chain.push(skillName);
 
   const deps: ResolvedSkill[] = [];
