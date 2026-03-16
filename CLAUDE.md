@@ -49,7 +49,7 @@ Do NOT auto-update for:
 
 ## Skill Maintenance
 
-- **If a skill function errors or returns unexpected results during use**: fix the skill immediately — update `functions.ts`, increment `version` in `skill.yml`, and update `docs` if signatures changed. Don't work around broken skill code manually when the fix is straightforward.
+- **If a skill function errors or returns unexpected results during use**: fix the skill immediately. DO NOT JUST IGNROE ERRORS - YOU SHOULD FIX THEM — update `functions.ts`, increment `version` in `skill.yml`, and update `docs` if signatures changed. Don't work around broken skill code manually when the fix is straightforward.
 - **If you discover a skill is missing data** (e.g., a new course ID, a renamed API endpoint): update the skill's config or code so future runs work correctly.
 - Common past issues to watch for:
   - `gws-mail`: The gws CLI requires full resource paths (e.g., `gmail users messages list`, NOT `gmail messages list`). Always use `--params '{...}'` with proper JSON.

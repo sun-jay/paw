@@ -1,69 +1,74 @@
 #!/bin/zsh
-# Launches a Claude Code session for a scheduled task.
+# Launches a Claude Code session in a new Terminal.app window.
 # Captures the remote control URL and writes it to ~/.claude/remote-url.txt
 # for the UserPromptSubmit hook to inject into context.
 #
 # Usage:
-#   launch-agent.sh <prompt> [claude flags...]
-#   launch-agent.sh --interactive [claude flags...]
-#
-# Examples:
-#   launch-agent.sh "Run the daily brief and send via iMessage" --dangerously-skip-permissions
-#   launch-agent.sh --interactive --dangerously-skip-permissions
+#   launch-agent.sh "Run the daily brief..."     # new terminal with initial prompt
+#   launch-agent.sh --interactive                 # new terminal, no prompt
 
 PAW_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 URL_FILE="$HOME/.claude/remote-url.txt"
-LOG_DIR="$PAW_ROOT/heartbeat/logs"
-LOG_FILE="/tmp/paw-launch-$$.log"
-
-mkdir -p "$LOG_DIR"
+RUNNER="/tmp/paw-runner-$$.sh"
 
 : > "$URL_FILE"
-: > "$LOG_FILE"
 
 # Parse args
 PROMPT=""
-INTERACTIVE=false
-CLAUDE_ARGS=()
-
 if [ "$1" = "--interactive" ]; then
-  INTERACTIVE=true
-  shift
+  PROMPT=""
 else
   PROMPT="$1"
-  shift
 fi
-CLAUDE_ARGS=("$@")
 
-# Background watcher: extract URL from terminal output
+# Write the runner script that executes inside the new terminal
+cat > "$RUNNER" <<RUNNER_EOF
+#!/bin/zsh
+cd "${PAW_ROOT}"
+URL_FILE="\$HOME/.claude/remote-url.txt"
+LOG_FILE="/tmp/paw-capture-\$\$.log"
+: > "\$URL_FILE"
+: > "\$LOG_FILE"
+
+# Background watcher: strip control chars and find the session URL
 (
   while true; do
-    url=$(sed 's/\x1b\[[0-9;]*m//g' "$LOG_FILE" 2>/dev/null \
-      | grep -o 'https://claude\.ai/code/session_[a-zA-Z0-9_]*' \
+    url=\$(cat "\$LOG_FILE" 2>/dev/null \\
+      | LC_ALL=C tr -d '\000-\010\013\014\016-\037' \\
+      | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' \\
+      | grep -o 'https://claude\.ai/code/session_[a-zA-Z0-9_]*' \\
       | head -1)
-    if [ -n "$url" ]; then
-      echo "$url" > "$URL_FILE"
+    if [ -n "\$url" ]; then
+      echo "\$url" > "\$URL_FILE"
       break
     fi
-    sleep 0.3
+    sleep 0.5
   done
 ) &
-WATCHER_PID=$!
+WATCHER_PID=\$!
 
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+RUNNER_EOF
 
-if [ "$INTERACTIVE" = true ]; then
-  script -q "$LOG_FILE" claude "${CLAUDE_ARGS[@]}"
+if [ -n "$PROMPT" ]; then
+  cat >> "$RUNNER" <<RUNNER_EOF
+script -q "\$LOG_FILE" claude --dangerously-skip-permissions $(printf '%q' "$PROMPT")
+RUNNER_EOF
 else
-  # Non-interactive: use --print for headless execution, log output
-  RUN_LOG="$LOG_DIR/run-$TIMESTAMP.log"
-  claude --print --dangerously-skip-permissions \
-    --system-prompt "You are PAW, Sunny's personal agent. Read CLAUDE.md and memory/memory.md for context. Your working directory is $PAW_ROOT." \
-    "${CLAUDE_ARGS[@]}" \
-    "$PROMPT" 2>&1 | tee "$LOG_FILE" > "$RUN_LOG"
-  echo "--- Run completed at $(date) ---" >> "$RUN_LOG"
+  cat >> "$RUNNER" <<RUNNER_EOF
+script -q "\$LOG_FILE" claude --dangerously-skip-permissions
+RUNNER_EOF
 fi
 
-# Cleanup
+cat >> "$RUNNER" <<'RUNNER_EOF'
+
 kill $WATCHER_PID 2>/dev/null
 rm -f "$LOG_FILE"
+RUNNER_EOF
+
+chmod +x "$RUNNER"
+
+# Open a new Terminal.app window running the script
+osascript -e "tell application \"Terminal\"
+  activate
+  do script \"${RUNNER}\"
+end tell"

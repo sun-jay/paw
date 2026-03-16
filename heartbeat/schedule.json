@@ -5,7 +5,6 @@
     "cron": "0 8 * * *",
     "prompt": "Run the daily brief. Compile Canvas, EdStem, school email, personal Gmail, and calendar data. Present the full briefing, then send a concise iMessage summary to sunny.jyrm@gmail.com with the session link.",
     "enabled": true,
-    "lastRun": null,
-    "notify": "sunny.jyrm@gmail.com"
+    "lastRun": null
   }
 ]

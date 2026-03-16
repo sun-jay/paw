@@ -7,7 +7,16 @@
  * separately and merge the results. This file handles the code-accessible sources.
  */
 
+import { activate } from "../secretsmanager/functions.ts";
+
 const TZ = "America/Los_Angeles";
+
+let _activated = false;
+async function ensureActivated() {
+  if (_activated) return;
+  await activate("daily-brief");
+  _activated = true;
+}
 
 // ---------------------------------------------------------------------------
 // Spring 2026 course config
@@ -66,7 +75,7 @@ export async function raw_canvasBrief(): Promise<{
   assignmentsDueSoon: { assignment: any; submission: any; courseId: number }[];
   announcements: any[];
 }> {
-  // Lazy import — canvas functions are available because skill_dependencies resolved them
+  await ensureActivated();
   const canvas = await import("../canvas/functions.ts");
 
   const now = new Date();
@@ -146,6 +155,7 @@ export async function raw_edBrief(): Promise<{
   recentThreads: { courseId: number; courseName: string; threads: any[] }[];
   keywordHits: { courseId: number; keyword: string; threads: any[] }[];
 }> {
+  await ensureActivated();
   const ed = await import("../edstem/functions.ts");
 
   const weekAgo = new Date();
@@ -204,6 +214,7 @@ export async function raw_edBrief(): Promise<{
 // ---------------------------------------------------------------------------
 
 export async function raw_schoolEmail(): Promise<{ messages: { id: string; from: string; subject: string; date: string; snippet: string }[] }> {
+  await ensureActivated();
   const gwsMail = await import("../gws-mail/functions.ts");
 
   let result: any;

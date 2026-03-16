@@ -21,7 +21,6 @@ export interface ScheduleEntry {
   prompt: string;
   enabled: boolean;
   lastRun: string | null;
-  notify?: string;
 }
 
 type ScheduleUpdate = Partial<Omit<ScheduleEntry, "id">>;
@@ -99,7 +98,6 @@ export function addEntry(entry: ScheduleEntry): string {
     prompt: entry.prompt,
     enabled: entry.enabled ?? true,
     lastRun: null,
-    notify: entry.notify,
   });
 
   write(entries);

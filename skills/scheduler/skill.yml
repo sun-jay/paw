@@ -48,7 +48,6 @@ docs: |
   | prompt   | string         | The prompt sent to Claude Code when triggered |
   | enabled  | boolean        | Toggle on/off without deleting |
   | lastRun  | string | null  | ISO timestamp of last execution (set by dispatcher) |
-  | notify   | string?        | Optional contact for iMessage notifications |
 
   ### Cron Quick Reference
 

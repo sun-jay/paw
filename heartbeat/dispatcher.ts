@@ -24,7 +24,6 @@ interface ScheduleEntry {
   prompt: string;
   enabled: boolean;
   lastRun: string | null;
-  notify?: string;
 }
 
 function log(msg: string): void {

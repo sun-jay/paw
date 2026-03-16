@@ -1,5 +1,5 @@
 name: daily-brief
-version: 2
+version: 3
 secrets: {}
 skill_dependencies:
   - canvas
@@ -85,9 +85,12 @@ docs: |
   | Crude Awakening: Oil & Gas Fundamentals| 1553928    | —      | CIVENG 198   |
   | Intro to Quant Finance                 | —          | 94543  | IEOR 198     |
 
-  ### Step 3 — Send via iMessage (optional, when user requests)
+  ### Step 3 — ALWAYS Send via iMessage (MANDATORY — NOT optional)
 
-  After compiling the full briefing, send a concise phone-friendly summary via iMessage
+  **YOU MUST ALWAYS send the iMessage brief after compiling the briefing. Do NOT skip this step.
+  Do NOT wait for the user to ask. This is part of the daily brief procedure.**
+
+  Send a concise phone-friendly summary via iMessage
   to sunny.jyrm@gmail.com. Use `osascript` to send.
 
   **iMessage formatting rules** (AppleScript only supports plain text):
