@@ -1,0 +1,78 @@
+name: scheduler
+version: 1
+secrets: {}
+skill_dependencies: []
+
+docs: |
+  ## Scheduler
+
+  Manages PAW's heartbeat — the schedule of automated agent sessions.
+
+  The schedule lives in `heartbeat/schedule.json`. Each entry defines a recurring task
+  that the dispatcher (`heartbeat/dispatcher.ts`) checks every 60 seconds via launchd.
+  When an entry's cron expression matches the current time, the dispatcher launches a
+  Claude Code session via `heartbeat/launch-agent.sh` with the entry's prompt.
+
+  ### Architecture
+
+  ```
+  launchd (every 60s)
+    → bun run heartbeat/dispatcher.ts
+      → reads heartbeat/schedule.json
+      → for each enabled entry where cron matches now:
+        → spawns heartbeat/launch-agent.sh <prompt>
+          → starts Claude Code with --print (headless)
+          → captures session URL
+          → logs to heartbeat/logs/
+  ```
+
+  ### Schedule Entry Format
+
+  ```json
+  {
+    "id": "daily-brief",
+    "skill": "daily-brief",
+    "cron": "0 8 * * *",
+    "prompt": "Run the daily brief and send via iMessage...",
+    "enabled": true,
+    "lastRun": null,
+    "notify": "sunny.jyrm@gmail.com"
+  }
+  ```
+
+  | Field    | Type           | Description |
+  |----------|----------------|-------------|
+  | id       | string         | Unique identifier for the entry |
+  | skill    | string         | Skill name (for reference — the prompt does the actual work) |
+  | cron     | string         | Standard 5-field cron expression (min hour dom mon dow) |
+  | prompt   | string         | The prompt sent to Claude Code when triggered |
+  | enabled  | boolean        | Toggle on/off without deleting |
+  | lastRun  | string | null  | ISO timestamp of last execution (set by dispatcher) |
+  | notify   | string?        | Optional contact for iMessage notifications |
+
+  ### Cron Quick Reference
+
+  - `0 8 * * *` — daily at 8:00 AM
+  - `0 8 * * 1-5` — weekdays at 8:00 AM
+  - `*/30 * * * *` — every 30 minutes
+  - `0 20 * * 0` — Sundays at 8:00 PM
+  - `0 9 * * 1` — Mondays at 9:00 AM
+
+  All times are in the system's local timezone (America/Los_Angeles).
+
+  ### Functions
+
+  - `listEntries()` — returns all schedule entries
+  - `getEntry(id)` — returns a single entry by ID
+  - `addEntry(entry)` — adds a new entry (validates, assigns ID if missing)
+  - `updateEntry(id, updates)` — updates fields on an existing entry
+  - `removeEntry(id)` — removes an entry by ID
+  - `enableEntry(id)` / `disableEntry(id)` — toggle enabled state
+  - `installLaunchd()` — symlinks the plist and loads it into launchd
+  - `uninstallLaunchd()` — unloads and removes the plist symlink
+
+  ### Installing / Uninstalling the Heartbeat
+
+  The agent can call `installLaunchd()` and `uninstallLaunchd()` to manage the launchd
+  service. Once installed, the dispatcher runs every 60 seconds automatically, even after
+  reboot.

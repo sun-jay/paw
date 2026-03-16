@@ -55,6 +55,11 @@ Do NOT auto-update for:
   - `gws-mail`: The gws CLI requires full resource paths (e.g., `gmail users messages list`, NOT `gmail messages list`). Always use `--params '{...}'` with proper JSON.
   - Background agents can't use Bash — prefer running skill functions directly in the main thread.
 
+## File Output
+
+- Save generated files (charts, exports, temp data, etc.) to `storage/`, never the project root
+- `storage/` is gitignored — treat it as a scratch/output directory
+
 ## Custom Instructions
 
 - **Always link your sources.** When referencing any item (assignment, email, thread, event, etc.), include a clickable link. If a link isn't available, say so explicitly — never silently omit it. The user should be able to click through to anything you mention.
