@@ -1,0 +1,72 @@
+name: gws-mail
+version: 2
+secrets:
+  GWS_CLIENT_ID: op://personal_agent_workspace/GWS-CLI/client_id
+  GWS_CLIENT_SECRET: op://personal_agent_workspace/GWS-CLI/client_secret
+  GWS_REFRESH_TOKEN: op://personal_agent_workspace/GWS-CLI/refresh_token
+skill_dependencies: []
+
+docs: |
+  ## GWS Mail — School Email (Berkeley)
+
+  Gmail integration for sjayaram@berkeley.edu via the Google Workspace CLI (`gws`).
+  Also supports Calendar access for the school account.
+
+  ### Prerequisites
+
+  - `gws` CLI installed globally: `bun install -g @googleworkspace/cli` (v0.13.2+)
+  - `gcloud` CLI installed: `brew install --cask google-cloud-sdk`
+  - GCP project: `personalassistantworkspace` (project number: 670790583767)
+  - OAuth client type: Desktop app, created in Google Cloud Console
+  - Credentials stored in 1Password item `GWS-CLI` with fields: client_id, client_secret, refresh_token
+
+  ### Initial Setup (already done)
+
+  1. Created GCP project `personalassistantworkspace` in Google Cloud Console
+  2. Configured OAuth consent screen (External, test user: sjayaram@berkeley.edu)
+  3. Created OAuth Desktop client in Console (no API for this — must be manual)
+  4. Downloaded `client_secret_*.json` → placed at `~/.config/gws/client_secret.json`
+  5. Ran `gws auth login -s gmail,calendar` → authenticated as sjayaram@berkeley.edu
+  6. Exported credentials via `gws auth export --unmasked`
+  7. Stored client_id, client_secret, refresh_token in 1Password vault `personal_agent_workspace` item `GWS-CLI`
+
+  ### Re-auth (if token expires)
+
+  If the refresh token is revoked or expired:
+  ```bash
+  gws auth login -s gmail,calendar
+  gws auth export --unmasked  # get new refresh_token
+  # update 1Password: op item edit GWS-CLI refresh_token=<new_token>
+  ```
+
+  ### OAuth Scopes
+
+  - `https://www.googleapis.com/auth/gmail.modify` — read/send/label Gmail
+  - `https://www.googleapis.com/auth/calendar` — full Calendar access
+  - `openid` + `userinfo.email` — identity
+
+  ### When to use
+
+  Trigger on: school email, berkeley email, sjayaram, inbox, "check my email",
+  "any new emails", "email from professor", "send email", school calendar,
+  berkeley calendar, class schedule.
+
+  ### Functions
+
+  #### Raw (return parsed JSON)
+
+  - `raw_triage()` — unread inbox summary (sender, subject, date, id)
+  - `raw_getMessage(messageId)` — full message content
+  - `raw_searchMessages(query)` — search Gmail with query string
+  - `raw_listLabels()` — all Gmail labels
+  - `raw_send(to, subject, body)` — send an email
+  - `raw_reply(messageId, body)` — reply to a message
+  - `raw_calendarList(timeMin?, timeMax?)` — school calendar events
+
+  #### Readable (return condensed markdown)
+
+  - `readable_triage()` — formatted inbox summary
+  - `readable_getMessage(messageId)` — formatted single message
+  - `readable_searchMessages(query)` — formatted search results
+  - `readable_send(to, subject, body)` — send and confirm
+  - `readable_calendarToday()` — today's school calendar events

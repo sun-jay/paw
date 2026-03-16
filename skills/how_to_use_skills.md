@@ -80,6 +80,8 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 1. Edit `functions.ts` with the changes
 2. Increment `version` in `skill.yml` frontmatter
 3. Update the `docs` field in `skill.yml` if signatures changed
+4. Test by calling `activate("skillname")` and exercising the changed functions
+5. Once tested and working, commit the changes with a message describing what changed
 
 ## Deleting a Skill
 
