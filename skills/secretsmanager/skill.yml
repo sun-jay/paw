@@ -10,7 +10,7 @@ docs: |
   The bootstrap skill. Handles two responsibilities:
 
   1. **Skill activation** — parses any skill's `skill.yml`, resolves its dependency tree, injects secrets, and dynamically imports functions.
-  2. **1Password vault management** — CRUD operations on the `personal_agent_workspace` vault (create + read only, no delete/edit).
+  2. **1Password vault management** — CRUD operations on the vault (create + read only, no delete/edit).
 
   All other skills are activated through this one. It is always loaded first.
 
