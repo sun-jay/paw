@@ -1,33 +1,31 @@
 name: canvas
 version: 1
 secrets:
-  CANVAS_API_TOKEN: op://personal_agent_workspace/Canvas/credential
+  CANVAS_API_TOKEN: op://paw_vault/Canvas/credential
 skill_dependencies: []
 
 docs: |
-  ## Canvas LMS (bCourses @ UC Berkeley)
+  ## Canvas LMS
 
   Integration with Canvas LMS REST API for course data, assignments, grades, submissions,
   announcements, modules, files, and discussions.
 
-  API base: `https://bcourses.berkeley.edu/api/v1`
+  API base: Set via `CANVAS_BASE_URL` env var, or defaults to `https://canvas.instructure.com/api/v1`
   Timezone: America/Los_Angeles
 
   ### When to use
 
-  Trigger on: school, homework, assignments, due dates, grades, courses, Canvas, bCourses,
+  Trigger on: school, homework, assignments, due dates, grades, courses, Canvas,
   "what do I have to do", "morning check", "what's due", "plan my week", "weekly check",
-  "course status", "missing submissions", or any mention of specific courses like STAT 135.
+  "course status", "missing submissions", or any mention of specific courses.
 
-  ### Spring 2026 Courses
+  ### Courses
+
+  Configure your course IDs here after running `readable_myCourses()` to discover them.
 
   | Course                                | Canvas ID  | Code             |
   |---------------------------------------|------------|------------------|
-  | Concepts of Statistics                 | 1552931    | STAT 135         |
-  | Openness to Opposing Views             | 1551874    | LS 4/104         |
-  | Service Operations Design and Analysis | 1553372    | INDENG 151       |
-  | The Supreme Court & Public Policy      | 1552095    | LS 138           |
-  | Crude Awakening: Oil & Gas Fundamentals| 1553928    | CIVENG 198       |
+  | Example Course                        | 123456     | COURSE 101       |
 
   ### Functions
 
@@ -60,8 +58,8 @@ docs: |
 
   ### Link Format
 
-  Assignment links: `https://bcourses.berkeley.edu/courses/{courseId}/assignments/{assignmentId}`
-  Course links: `https://bcourses.berkeley.edu/courses/{courseId}`
+  Assignment links: `{CANVAS_BASE_URL}/courses/{courseId}/assignments/{assignmentId}`
+  Course links: `{CANVAS_BASE_URL}/courses/{courseId}`
   File viewer links: use `display_url` or HTML URL, NOT direct download URLs.
 
   ### User Preferences

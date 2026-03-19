@@ -5,7 +5,7 @@ import { parse as parseYaml } from "yaml";
 
 const ROOT_DIR = resolve(import.meta.dir, "../..");
 const SKILLS_DIR = resolve(import.meta.dir, "..");
-const DEFAULT_VAULT = "personal_agent_workspace";
+const DEFAULT_VAULT = process.env.PAW_VAULT_NAME ?? "paw_vault";
 
 loadEnv();
 

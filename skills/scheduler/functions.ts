@@ -6,7 +6,7 @@ const HEARTBEAT_DIR = resolve(import.meta.dir, "../../heartbeat");
 const SCHEDULE_PATH = join(HEARTBEAT_DIR, "schedule.json");
 const PLIST_SRC = join(HEARTBEAT_DIR, "com.paw.heartbeat.plist");
 const PLIST_DEST = join(
-  process.env.HOME ?? "/Users/sunnyjay",
+  process.env.HOME ?? "",
   "Library/LaunchAgents/com.paw.heartbeat.plist"
 );
 

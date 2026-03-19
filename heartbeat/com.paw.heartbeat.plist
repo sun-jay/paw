@@ -5,15 +5,16 @@
   <key>Label</key>
   <string>com.paw.heartbeat</string>
 
+  <!-- UPDATE THESE PATHS to match your system -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/sunnyjay/.bun/bin/bun</string>
+    <string>/usr/local/bin/bun</string>
     <string>run</string>
-    <string>/Users/sunnyjay/Documents/VScode/paw/heartbeat/dispatcher.ts</string>
+    <string>/path/to/paw/heartbeat/dispatcher.ts</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/sunnyjay/Documents/VScode/paw</string>
+  <string>/path/to/paw</string>
 
   <key>StartInterval</key>
   <integer>60</integer>
@@ -21,14 +22,14 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/Users/sunnyjay/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/Users/sunnyjay/Documents/VScode/paw/heartbeat/logs/launchd-stdout.log</string>
+  <string>/path/to/paw/heartbeat/logs/launchd-stdout.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/sunnyjay/Documents/VScode/paw/heartbeat/logs/launchd-stderr.log</string>
+  <string>/path/to/paw/heartbeat/logs/launchd-stderr.log</string>
 
   <key>RunAtLoad</key>
   <true/>

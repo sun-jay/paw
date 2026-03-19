@@ -1,7 +1,7 @@
 name: edstem
 version: 1
 secrets:
-  ED_API_TOKEN: op://personal_agent_workspace/EdStem/credential
+  ED_API_TOKEN: op://paw_vault/EdStem/credential
 skill_dependencies: []
 
 docs: |
@@ -14,14 +14,11 @@ docs: |
 
   ### Known Course IDs
 
+  Configure your course IDs here after running `readable_myCourses()` to discover them.
+
   | Course               | Ed ID | Status   |
   |----------------------|-------|----------|
-  | STAT 135 (Spring 26) | 94278 | Active   |
-  | IEOR 198 (Spring 26) | 94543 | Active   |
-  | STAT 134 (Fall 25)   | 84963 | Archived |
-  | Stat 001 community   | 26372 | Active   |
-  | EECS 101             | 23247 | Active   |
-  | STAT 133             | 84260 | Active   |
+  | Example Course 101   | 12345 | Active   |
 
   ### Functions
 

@@ -28,7 +28,7 @@ Every skill folder must have a `skill.yml`. It is a plain YAML file with config 
 name: myskill
 version: 1
 secrets:
-  MY_TOKEN: op://personal_agent_workspace/myskill/token
+  MY_TOKEN: op://paw_vault/myskill/token
 skill_dependencies: []
 schedule: null
 
@@ -58,7 +58,7 @@ docs: |
 Two layers of functions:
 
 - **`raw_*`** — return `Promise<any>` or `Promise<any[]>`. One function per API endpoint. Direct responses, no transformation.
-- **`readable_*`** — return `Promise<string>`. Compose multiple `raw_*` calls. Output is markdown or plain text, condensed for token efficiency. Convert timestamps to Pacific Time.
+- **`readable_*`** — return `Promise<string>`. Compose multiple `raw_*` calls. Output is markdown or plain text, condensed for token efficiency. Convert timestamps to local timezone.
 
 All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Functions should catch errors and return readable error strings, not throw.
 
@@ -71,7 +71,7 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
    import { createSecret } from "./secretsmanager/functions.ts";
    createSecret("MySkill", "credential", "the-token-value");
    ```
-   The `op://` reference in `skill.yml` should match: `op://personal_agent_workspace/MySkill/credential`
+   The `op://` reference in `skill.yml` should match: `op://paw_vault/MySkill/credential`
 4. Write `functions.ts` with the raw and readable layers
 5. Test by calling `activate("skillname")` — this resolves secrets from 1Password and imports functions. Never set `process.env` tokens manually, even for testing.
 
@@ -96,7 +96,7 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 ```
 .env (root)                    1Password vault
     │                              │
-    └─ OP_SERVICE_ACCOUNT_TOKEN    └─ op://personal_agent_workspace/*/...
+    └─ OP_SERVICE_ACCOUNT_TOKEN    └─ op://paw_vault/*/...
            │                              │
            ▼                              ▼
     secretsmanager ──── op read ──── fetches secret values
@@ -106,7 +106,7 @@ All secrets are accessed via `process.env.SECRET_NAME` — never hardcoded. Func
 ```
 
 - The **only** secret stored locally is `OP_SERVICE_ACCOUNT_TOKEN` in the root `.env` (gitignored)
-- Every other secret lives in the `personal_agent_workspace` vault in 1Password
+- Every other secret lives in the 1Password vault
 - Skills declare which secrets they need in their `skill.yml` frontmatter as `ENV_VAR: op://reference` pairs
 - When `activate` runs, it collects all secrets from the skill + its dependencies, fetches them from 1Password via `op read`, and sets them on `process.env`
 - Skill functions access secrets via `process.env.SECRET_NAME` — they never see `op://` references or raw tokens
@@ -138,7 +138,7 @@ A skill with dependencies doesn't need to declare its dependencies' secrets — 
 
 ## Vault
 
-- **Name**: `personal_agent_workspace`
+- **Name**: configurable via `PAW_VAULT_NAME` env var (default: `paw_vault`)
 - **Provider**: 1Password
 - **Access**: via service account token with read + write permissions
 - **CLI**: `op` (1Password CLI v2.32.1+)

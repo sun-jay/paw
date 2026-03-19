@@ -1,5 +1,5 @@
 /**
- * Daily Briefing — orchestrates Canvas, EdStem, and school email into a single brief.
+ * Daily Briefing — orchestrates Canvas, EdStem, and email into a single brief.
  *
  * Dependencies: canvas, edstem, gws-mail (activated via skill_dependencies)
  *
@@ -19,26 +19,22 @@ async function ensureActivated() {
 }
 
 // ---------------------------------------------------------------------------
-// Spring 2026 course config
+// Course config — UPDATE THESE with your actual course IDs
 // ---------------------------------------------------------------------------
 
-const CANVAS_COURSE_IDS = [1552931, 1553372, 1551874, 1552095, 1553928];
-const ED_ACTIVE_COURSE_IDS = [94278, 94543];
+// Canvas course IDs (find via readable_myCourses() from the canvas skill)
+const CANVAS_COURSE_IDS: number[] = [];
 
-const COURSE_NAMES: Record<number, string> = {
-  1552931: "STAT 135",
-  1553372: "INDENG 151",
-  1551874: "LS 4/104",
-  1552095: "LS 138",
-  1553928: "CIVENG 198",
-};
+// EdStem active course IDs (find via readable_myCourses() from the edstem skill)
+const ED_ACTIVE_COURSE_IDS: number[] = [];
 
-const ED_COURSE_NAMES: Record<number, string> = {
-  94278: "STAT 135",
-  94543: "IEOR 198",
-};
+// Human-readable names for Canvas courses (Canvas ID → display name)
+const COURSE_NAMES: Record<number, string> = {};
 
-const ED_KEYWORDS = ["exam", "midterm", "quiz", "CBTF", "homework", "due", "deadline", "office hours", "final"];
+// Human-readable names for Ed courses (Ed ID → display name)
+const ED_COURSE_NAMES: Record<number, string> = {};
+
+const ED_KEYWORDS = ["exam", "midterm", "quiz", "homework", "due", "deadline", "office hours", "final"];
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "no date";
@@ -53,7 +49,8 @@ function fmtDate(iso: string | null | undefined): string {
 }
 
 function assignmentLink(courseId: number, assignmentId: number): string {
-  return `https://bcourses.berkeley.edu/courses/${courseId}/assignments/${assignmentId}`;
+  const base = (process.env.CANVAS_BASE_URL ?? "https://canvas.instructure.com/api/v1").replace("/api/v1", "");
+  return `${base}/courses/${courseId}/assignments/${assignmentId}`;
 }
 
 function edLink(courseId: number, threadId: number): string {
@@ -90,9 +87,14 @@ export async function raw_canvasBrief(): Promise<{
     canvas.raw_getCourses().catch(() => []),
   ]);
 
+  // Use configured course IDs, or fall back to all active courses
+  const courseIds = CANVAS_COURSE_IDS.length > 0
+    ? CANVAS_COURSE_IDS
+    : courses.map((c: any) => c.id);
+
   // Phase 2: per-course assignments (parallel)
   const assignmentResults = await Promise.all(
-    CANVAS_COURSE_IDS.map(async (courseId) => {
+    courseIds.map(async (courseId: number) => {
       try {
         const assignments = await canvas.raw_getAssignments(courseId);
         return { courseId, assignments };
@@ -129,7 +131,7 @@ export async function raw_canvasBrief(): Promise<{
   // Phase 4: announcements (single call with all course IDs)
   let announcements: any[] = [];
   try {
-    announcements = await canvas.raw_getAnnouncements(CANVAS_COURSE_IDS);
+    announcements = await canvas.raw_getAnnouncements(courseIds);
     // Filter to last 7 days
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
@@ -161,9 +163,20 @@ export async function raw_edBrief(): Promise<{
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
+  // If no course IDs configured, try to discover them
+  let courseIds = ED_ACTIVE_COURSE_IDS;
+  if (courseIds.length === 0) {
+    try {
+      const userData = await ed.raw_getUser();
+      courseIds = (userData.courses ?? []).map((c: any) => c.course.id);
+    } catch {
+      return { recentThreads: [], keywordHits: [] };
+    }
+  }
+
   // Phase 1: recent threads for each course (parallel)
   const recentResults = await Promise.all(
-    ED_ACTIVE_COURSE_IDS.map(async (courseId) => {
+    courseIds.map(async (courseId: number) => {
       try {
         const data = await ed.raw_listThreads(courseId, { limit: 25, sort: "new" });
         const threads = (data.threads ?? []).filter((t: any) => {
@@ -178,7 +191,7 @@ export async function raw_edBrief(): Promise<{
   );
 
   // Phase 2: keyword searches (parallel, batched)
-  const keywordSearches = ED_ACTIVE_COURSE_IDS.flatMap((courseId) =>
+  const keywordSearches = courseIds.flatMap((courseId: number) =>
     ED_KEYWORDS.map((keyword) => ({ courseId, keyword }))
   );
 
@@ -210,7 +223,7 @@ export async function raw_edBrief(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// School email brief
+// Email brief
 // ---------------------------------------------------------------------------
 
 export async function raw_schoolEmail(): Promise<{ messages: { id: string; from: string; subject: string; date: string; snippet: string }[] }> {
@@ -350,7 +363,7 @@ export async function readable_academicBrief(): Promise<string> {
   // Keyword hits not already seen
   const keywordHits = (edData as any).keywordHits ?? [];
   if (keywordHits.length > 0) {
-    lines.push("## EdStem Keyword Hits (exam/midterm/quiz/CBTF/deadline)", "");
+    lines.push("## EdStem Keyword Hits (exam/midterm/quiz/deadline)", "");
     for (const { courseId, keyword, threads } of keywordHits) {
       for (const t of threads) {
         lines.push(`- [${keyword}] **${t.title}** (${ED_COURSE_NAMES[courseId] ?? courseId}) — ${fmtDate(t.created_at)} — [link](${edLink(courseId, t.id)})`);
@@ -359,10 +372,10 @@ export async function readable_academicBrief(): Promise<string> {
     lines.push("");
   }
 
-  // --- SCHOOL EMAIL SECTION ---
+  // --- EMAIL SECTION ---
   const emails = (emailData as any).messages ?? [];
   if (emails.length > 0) {
-    lines.push("# School Email (sjayaram@berkeley.edu)", "");
+    lines.push("# Email", "");
     lines.push(`## Recent Messages (${emails.length})`, "");
     for (const m of emails) {
       lines.push(`- **${m.subject}** — from ${m.from} — ${m.date} (id: ${m.id})`);
@@ -374,7 +387,7 @@ export async function readable_academicBrief(): Promise<string> {
   // Error notes
   if ((canvasData as any).error) lines.push(`> Canvas error: ${(canvasData as any).error}`, "");
   if ((edData as any).error) lines.push(`> EdStem error: ${(edData as any).error}`, "");
-  if ((emailData as any).error) lines.push(`> School email error: ${(emailData as any).error}`, "");
+  if ((emailData as any).error) lines.push(`> Email error: ${(emailData as any).error}`, "");
 
   return lines.join("\n");
 }
