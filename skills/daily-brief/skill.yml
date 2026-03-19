@@ -10,7 +10,7 @@ docs: |
   ## Daily Briefing Skill
 
   Compiles a comprehensive daily briefing from all data sources:
-  Canvas, EdStem, school email (Berkeley), personal Gmail (MCP), and Google Calendar (MCP).
+  Canvas, EdStem, email (via gws-mail), personal Gmail (MCP), and Google Calendar (MCP).
 
   ### When to use
 
@@ -19,7 +19,7 @@ docs: |
 
   ### How it works
 
-  The skill has a `readable_academicBrief()` function that fetches Canvas + EdStem + school email
+  The skill has a `readable_academicBrief()` function that fetches Canvas + EdStem + email
   data in parallel and returns combined markdown. The agent must ALSO call MCP tools to get
   personal Gmail and Google Calendar data, then merge everything into the final briefing.
 
@@ -29,16 +29,16 @@ docs: |
 
   1. Call `readable_academicBrief()` from this skill's functions.ts
      - This handles: Canvas (todo, missing, assignments due in 14d, announcements, submission status),
-       EdStem (recent threads from active courses, keyword search for exam/midterm/quiz/CBTF/deadline),
-       and school email (sjayaram@berkeley.edu inbox via gws-mail)
+       EdStem (recent threads from active courses, keyword search for exam/midterm/quiz/deadline),
+       and email inbox via gws-mail
      - Returns combined markdown
 
   2. Call MCP `gcal_list_events` for the next 7 days
      - timeZone: America/Los_Angeles
      - timeMin/timeMax: today through +7 days
 
-  3. Call MCP `gmail_search_messages` with query `newer_than:3d` (personal Gmail sunny.jyrm@gmail.com)
-     - Read any actionable messages (housing, school-related, financial, anything needing a response)
+  3. Call MCP `gmail_search_messages` with query `newer_than:3d` (personal Gmail)
+     - Read any actionable messages
 
   **Step 2 — Compile the briefing**:
 
@@ -69,74 +69,18 @@ docs: |
   - Every referenced item MUST have a clickable link. No exceptions.
   - Canvas assignments/announcements: use `html_url` from the API response
   - EdStem threads: `https://edstem.org/us/courses/{courseId}/discussion/{threadId}`
-  - School emails: `https://mail.google.com/mail/u/1/#inbox/{messageId}` (u/1 = sjayaram@berkeley.edu)
-  - Personal Gmail: `https://mail.google.com/mail/u/0/#inbox/{messageId}` (u/0 = sunny.jyrm@gmail.com)
+  - Email: link to Gmail web UI if message ID is available
   - Calendar events: link to Google Calendar event URL if available
   - If a link is unavailable, explicitly say "(no link available)" — never silently omit it
 
-  ### Spring 2026 Courses
+  ### Courses
 
-  | Course                                | Canvas ID  | Ed ID  | Code         |
-  |---------------------------------------|------------|--------|--------------|
-  | Concepts of Statistics                 | 1552931    | 94278  | STAT 135     |
-  | Openness to Opposing Views             | 1551874    | —      | LS 4/104     |
-  | Service Operations Design and Analysis | 1553372    | —      | INDENG 151   |
-  | The Supreme Court & Public Policy      | 1552095    | —      | LS 138       |
-  | Crude Awakening: Oil & Gas Fundamentals| 1553928    | —      | CIVENG 198   |
-  | Intro to Quant Finance                 | —          | 94543  | IEOR 198     |
-
-  ### Step 3 — ALWAYS Send via iMessage (MANDATORY — NOT optional)
-
-  **YOU MUST ALWAYS send the iMessage brief after compiling the briefing. Do NOT skip this step.
-  Do NOT wait for the user to ask. This is part of the daily brief procedure.**
-
-  Send a concise phone-friendly summary via iMessage
-  to sunny.jyrm@gmail.com. Use `osascript` to send.
-
-  **iMessage formatting rules** (AppleScript only supports plain text):
-  - NO markdown — no **, no ##, no []() links
-  - Use emoji for visual hierarchy: ⚠️ urgent, 📅 calendar, 📚 academics, 📧 email
-  - Use • for bullets
-  - Use ALL CAPS for section headers
-  - URLs go on their own line (iMessage auto-links them)
-  - Keep it SHORT — max ~30 lines, only the most important items
-  - Include the remote control URL (read from ~/.claude/remote-url.txt) at the bottom
-    with a label like "→ Continue this conversation:" so the user can tap to respond
-
-  **iMessage brief structure:**
-  ```
-  ☀️ Daily Brief — {date}
-
-  ⚠️ URGENT
-  • Assignment Name (COURSE) — due Tomorrow 11:59 PM
-    ❌ Not submitted
-    bcourses.berkeley.edu/courses/.../assignments/...
-
-  📅 TODAY
-  • 10:00 AM  Meeting name
-  • 2:00 PM   Class name
-
-  📚 THIS WEEK
-  • Assignment (COURSE) — due Wed Mar 18
-    ✅ Submitted
-
-  📧 NEEDS RESPONSE
-  • Email subject — from Sender
-
-  → Continue this conversation:
-  https://claude.ai/code/session_...
-  ```
-
-  **How to send:**
-  ```bash
-  osascript -e 'tell application "Messages" to send "MESSAGE_TEXT" to buddy "sunny.jyrm@gmail.com"'
-  ```
-  Escape double quotes in the message with backslash. For newlines, use \n inside
-  the AppleScript string or build the message with `& return &` joins.
+  Configure your Canvas and Ed course IDs in `functions.ts` after discovering them
+  via `readable_myCourses()` from the canvas and edstem skills.
 
   ### Functions
 
-  - `readable_academicBrief()` — combined Canvas + EdStem + school email briefing (parallel fetch)
+  - `readable_academicBrief()` — combined Canvas + EdStem + email briefing (parallel fetch)
   - `raw_canvasBrief()` — Canvas data only (todo, missing, assignments, announcements, submissions)
   - `raw_edBrief()` — EdStem data only (recent threads, keyword search across active courses)
-  - `raw_schoolEmail()` — School email inbox summary
+  - `raw_schoolEmail()` — Email inbox summary

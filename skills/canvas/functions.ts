@@ -1,4 +1,4 @@
-const BASE = "https://bcourses.berkeley.edu/api/v1";
+const BASE = process.env.CANVAS_BASE_URL ?? "https://canvas.instructure.com/api/v1";
 const TZ = "America/Los_Angeles";
 
 function token(): string {
@@ -73,11 +73,11 @@ function fmtDate(iso: string | null | undefined): string {
 }
 
 function courseLink(courseId: number): string {
-  return `https://bcourses.berkeley.edu/courses/${courseId}`;
+  return `${BASE.replace("/api/v1", "")}/courses/${courseId}`;
 }
 
 function assignmentLink(courseId: number, assignmentId: number): string {
-  return `https://bcourses.berkeley.edu/courses/${courseId}/assignments/${assignmentId}`;
+  return `${BASE.replace("/api/v1", "")}/courses/${courseId}/assignments/${assignmentId}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,8 +129,6 @@ export async function raw_getSubmission(courseId: number, assignmentId: number):
 }
 
 export async function raw_getAnnouncements(courseIds: number[]): Promise<any[]> {
-  const params: Record<string, string> = { per_page: "20" };
-  // Canvas wants context_codes[]=course_123 — we'll build the URL manually
   const url = new URL(`${BASE}/announcements`);
   url.searchParams.set("per_page", "20");
   for (const id of courseIds) {

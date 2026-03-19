@@ -142,9 +142,9 @@ export async function readable_triage(): Promise<string> {
   try {
     const result = await raw_triage();
     const messages = result.messages ?? [];
-    if (messages.length === 0) return "## School Inbox (sjayaram@berkeley.edu)\n\nNo unread messages.";
+    if (messages.length === 0) return "## Inbox\n\nNo unread messages.";
 
-    const lines = [`## School Inbox (sjayaram@berkeley.edu) — ${messages.length} unread`, ""];
+    const lines = [`## Inbox — ${messages.length} unread`, ""];
 
     // Fetch headers for each message (up to 10)
     for (const m of messages.slice(0, 10)) {
@@ -264,10 +264,10 @@ export async function readable_calendarToday(): Promise<string> {
     );
     const events = result.items ?? [];
 
-    if (events.length === 0) return "No school calendar events today.";
+    if (events.length === 0) return "No calendar events today.";
 
     const lines = [
-      `## School Calendar — ${fmtDate(now.toISOString())}`,
+      `## Calendar — ${fmtDate(now.toISOString())}`,
       "",
     ];
 
