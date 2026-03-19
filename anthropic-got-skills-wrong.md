@@ -157,76 +157,81 @@ This architecture gives you **four** vital security properties that Anthropic's 
 
 ## Putting it all together
 
-Here's what it actually looks like when a PAW agent handles a request end-to-end. The user asks: *"What's due this week?"*
-
-### Step 1: Activate the skill
-
-The agent calls `activate("canvas")` from the secretsmanager. This resolves dependencies, pulls secrets from 1Password into `process.env`, and returns the skill's docs + available functions:
-
-```typescript
-import { activate } from "./skills/secretsmanager/functions.ts";
-
-const result = await activate("canvas");
-console.log(result.summary);
-```
+Here's what it actually looks like in a real Claude Code terminal session. The user asks *"What's due this week?"* and the agent handles the rest:
 
 ```
-✓ Activated: canvas (v2)
-  Secrets injected: CANVAS_API_TOKEN
+╭──────────────────────────────────────────────────────────────────╮
+│ > What's due this week?                                          │
+╰──────────────────────────────────────────────────────────────────╯
 
-  Available functions:
-    canvas:
-      - raw_getProfile
-      - raw_getTodo
-      - raw_getCourses
-      - raw_getAssignments
-      - readable_myCourses
-      - readable_todo
-      - readable_weeklyPlan
-      - readable_courseAssignments
-      ...
+● I'll activate the Canvas skill and pull your weekly plan.
+
+  ── Bash ──────────────────────────────────────────────────────────
+  > bun -e '
+    import { activate } from "./skills/secretsmanager/functions.ts";
+    const r = await activate("canvas");
+    console.log(r.summary);
+  '
+
+  ✓ Activated: canvas (v2)
+    Secrets injected: CANVAS_API_TOKEN
+
+    Available functions:
+      canvas:
+        - raw_getProfile
+        - raw_getTodo
+        - raw_getCourses
+        - raw_getAssignments
+        - readable_myCourses
+        - readable_todo
+        - readable_weeklyPlan
+        - readable_courseAssignments
+
+  ── Bash ──────────────────────────────────────────────────────────
+  > bun -e '
+    import { activate } from "./skills/secretsmanager/functions.ts";
+    await activate("canvas");
+    import { readable_weeklyPlan } from "./skills/canvas/functions.ts";
+    console.log(await readable_weeklyPlan());
+  '
+
+  ## Weekly Plan
+  *Wed, Mar 19, 8:00 AM → Wed, Mar 26, 8:00 AM*
+
+  ### Missing / Overdue
+
+  - **Problem Set 7** (STAT 135) — was due Mon, Mar 17, 11:59 PM — [link](...)
+
+  ### Upcoming To-Do
+
+  - **Lab 8** (DATA 100) — due Thu, Mar 20, 11:59 PM — [link](...)
+  - **Essay Draft 2** (LS 104) — due Fri, Mar 21, 5:00 PM — [link](...)
+
+  ### Current Grades
+
+  - **STAT 135**: 91.2% (A-)
+  - **DATA 100**: 88.5% (B+)
+
+● Here's your week:
+
+  ⚠️ **Overdue:** Problem Set 7 for STAT 135 — was due Monday.
+     You should submit this ASAP or check if late submissions are accepted.
+
+  📅 **Coming up:**
+  - Lab 8 (DATA 100) — due tomorrow night
+  - Essay Draft 2 (LS 104) — due Friday afternoon
+
+  📊 **Grades look solid** — 91.2% in STAT 135 and 88.5% in DATA 100.
+
+  Want me to check the submission policy for that late Problem Set?
 ```
 
-The agent now knows what functions exist (from the activation summary + the `docs` field in skill.yml), and the secret is live in the environment. The agent **never saw the token** — it just called `activate`.
+The entire interaction took **two shell commands**. Notice what the agent *didn't* do:
+- It didn't generate a `curl` command with an inline API key
+- It didn't parse a wall of raw JSON
+- It didn't hallucinate field names or guess at the response schema
+- It didn't send any secret to Anthropic's servers
 
-### Step 2: Call a readable function
+The `activate()` call pulled the Canvas token from 1Password into `process.env` locally. The `readable_weeklyPlan()` call fanned out to four Canvas API endpoints internally, joined the data, and returned ~0.3KB of pre-formatted markdown — versus the **20KB+** of raw JSON the agent would have had to parse otherwise. The agent just read the output and talked to the user.
 
-The agent picks `readable_weeklyPlan()` — a single function that internally fans out to four raw API calls (`raw_getCourses`, `raw_getTodo`, `raw_getMissingSubmissions`, `raw_getGrades`), joins the data, and returns concise markdown:
-
-```typescript
-import { readable_weeklyPlan } from "./skills/canvas/functions.ts";
-
-const plan = await readable_weeklyPlan();
-console.log(plan);
-```
-
-```markdown
-## Weekly Plan
-*Wed, Mar 19, 8:00 AM → Wed, Mar 26, 8:00 AM*
-
-### Missing / Overdue
-
-- **Problem Set 7** (STAT 135) — was due Mon, Mar 17, 11:59 PM — [link](...)
-
-### Upcoming To-Do
-
-- **Lab 8** (DATA 100) — due Thu, Mar 20, 11:59 PM — [link](...)
-- **Essay Draft 2** (LS 104) — due Fri, Mar 21, 5:00 PM — [link](...)
-
-### Current Grades
-
-- **STAT 135**: 91.2% (A-)
-- **DATA 100**: 88.5% (B+)
-```
-
-That's ~0.3KB of actionable markdown. The raw JSON behind those four API calls would be **20KB+**. The agent reads the readable output, presents it to the user, and moves on — no JSON wrangling, no hallucinated field names, no wasted tokens.
-
-### Why this matters
-
-The entire interaction cost **one function call to activate** and **one function call to get the answer**. The agent:
-- Never saw an API key
-- Never parsed raw JSON
-- Never generated boilerplate HTTP code as output tokens
-- Got a pre-formatted, link-rich answer it can relay directly
-
-Compare this to Anthropic's skill model, where the agent would read an `.md` file, generate a `curl` command with a hardcoded token, parse the raw JSON response, and try to format it — burning tokens and introducing failure points at every step.
+Compare this to what happens with Anthropic's `.md`-only skills: the agent reads a markdown file, generates `curl` commands with a hardcoded token as output tokens, pipes the result, tries to parse nested JSON inline, and formats a response — burning tokens and introducing failure points at every step. One bad field name and the whole thing hallucinated.
