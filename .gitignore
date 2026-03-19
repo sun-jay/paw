@@ -11,8 +11,8 @@ coverage
 *.lcov
 
 # logs
-logs
-_.log
+*.log
+heartbeat/logs/*.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # dotenv environment variable files
@@ -33,5 +33,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
-# local-only skills
-skills/edstem/
+# storage (agent-generated files)
+storage/
