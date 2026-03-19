@@ -152,3 +152,81 @@ This architecture gives you **four** vital security properties that Anthropic's 
 - The only local secret is `OP_SERVICE_ACCOUNT_TOKEN` — the 1Password service account token that bootstraps everything
 - As a corollary of 3c, revoke this one token and the agent loses access to **all** secrets at once
 - This is the most fundamental "pull the plug, the agent has gone rogue" e-stop. Don't cut off its compute, cut off its **secrets**. You should NOT give your agent a wallet if you can't remote pull the secret key at any time!
+
+---
+
+## Putting it all together
+
+Here's what it actually looks like when a PAW agent handles a request end-to-end. The user asks: *"What's due this week?"*
+
+### Step 1: Activate the skill
+
+The agent calls `activate("canvas")` from the secretsmanager. This resolves dependencies, pulls secrets from 1Password into `process.env`, and returns the skill's docs + available functions:
+
+```typescript
+import { activate } from "./skills/secretsmanager/functions.ts";
+
+const result = await activate("canvas");
+console.log(result.summary);
+```
+
+```
+✓ Activated: canvas (v2)
+  Secrets injected: CANVAS_API_TOKEN
+
+  Available functions:
+    canvas:
+      - raw_getProfile
+      - raw_getTodo
+      - raw_getCourses
+      - raw_getAssignments
+      - readable_myCourses
+      - readable_todo
+      - readable_weeklyPlan
+      - readable_courseAssignments
+      ...
+```
+
+The agent now knows what functions exist (from the activation summary + the `docs` field in skill.yml), and the secret is live in the environment. The agent **never saw the token** — it just called `activate`.
+
+### Step 2: Call a readable function
+
+The agent picks `readable_weeklyPlan()` — a single function that internally fans out to four raw API calls (`raw_getCourses`, `raw_getTodo`, `raw_getMissingSubmissions`, `raw_getGrades`), joins the data, and returns concise markdown:
+
+```typescript
+import { readable_weeklyPlan } from "./skills/canvas/functions.ts";
+
+const plan = await readable_weeklyPlan();
+console.log(plan);
+```
+
+```markdown
+## Weekly Plan
+*Wed, Mar 19, 8:00 AM → Wed, Mar 26, 8:00 AM*
+
+### Missing / Overdue
+
+- **Problem Set 7** (STAT 135) — was due Mon, Mar 17, 11:59 PM — [link](...)
+
+### Upcoming To-Do
+
+- **Lab 8** (DATA 100) — due Thu, Mar 20, 11:59 PM — [link](...)
+- **Essay Draft 2** (LS 104) — due Fri, Mar 21, 5:00 PM — [link](...)
+
+### Current Grades
+
+- **STAT 135**: 91.2% (A-)
+- **DATA 100**: 88.5% (B+)
+```
+
+That's ~0.3KB of actionable markdown. The raw JSON behind those four API calls would be **20KB+**. The agent reads the readable output, presents it to the user, and moves on — no JSON wrangling, no hallucinated field names, no wasted tokens.
+
+### Why this matters
+
+The entire interaction cost **one function call to activate** and **one function call to get the answer**. The agent:
+- Never saw an API key
+- Never parsed raw JSON
+- Never generated boilerplate HTTP code as output tokens
+- Got a pre-formatted, link-rich answer it can relay directly
+
+Compare this to Anthropic's skill model, where the agent would read an `.md` file, generate a `curl` command with a hardcoded token, parse the raw JSON response, and try to format it — burning tokens and introducing failure points at every step.
