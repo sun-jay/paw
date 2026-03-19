@@ -1,0 +1,10 @@
+[
+  {
+    "id": "daily-brief",
+    "skill": "daily-brief",
+    "cron": "0 8 * * *",
+    "prompt": "Run the daily brief. Compile Canvas, EdStem, email, personal Gmail, and calendar data. Present the full briefing.",
+    "enabled": true,
+    "lastRun": null
+  }
+]

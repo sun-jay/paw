@@ -1,0 +1,86 @@
+name: daily-brief
+version: 3
+secrets: {}
+skill_dependencies:
+  - canvas
+  - edstem
+  - gws-mail
+
+docs: |
+  ## Daily Briefing Skill
+
+  Compiles a comprehensive daily briefing from all data sources:
+  Canvas, EdStem, email (via gws-mail), personal Gmail (MCP), and Google Calendar (MCP).
+
+  ### When to use
+
+  Trigger on: "daily brief", "morning check", "briefing", "what do I need to know",
+  "catch me up", "what's going on", "daily update", "plan my day", "weekly check".
+
+  ### How it works
+
+  The skill has a `readable_academicBrief()` function that fetches Canvas + EdStem + email
+  data in parallel and returns combined markdown. The agent must ALSO call MCP tools to get
+  personal Gmail and Google Calendar data, then merge everything into the final briefing.
+
+  ### Full procedure (agent must follow)
+
+  **Step 1 — Parallel data fetch** (do ALL of these at once):
+
+  1. Call `readable_academicBrief()` from this skill's functions.ts
+     - This handles: Canvas (todo, missing, assignments due in 14d, announcements, submission status),
+       EdStem (recent threads from active courses, keyword search for exam/midterm/quiz/deadline),
+       and email inbox via gws-mail
+     - Returns combined markdown
+
+  2. Call MCP `gcal_list_events` for the next 7 days
+     - timeZone: America/Los_Angeles
+     - timeMin/timeMax: today through +7 days
+
+  3. Call MCP `gmail_search_messages` with query `newer_than:3d` (personal Gmail)
+     - Read any actionable messages
+
+  **Step 2 — Compile the briefing**:
+
+  Merge all results into a single prioritized summary using this structure:
+
+  ```
+  # Daily Briefing — {date}
+
+  ## URGENT (Due within 48 hours)
+  - Items requiring immediate action, with links and submission status
+
+  ## THIS WEEK
+  - Assignments, events, and tasks due in the next 7 days
+
+  ## COMING UP (Next 7-14 days)
+  - Longer-term deadlines and events
+
+  ## ANNOUNCEMENTS & UPDATES
+  - Important announcements from Canvas, EdStem, and email
+
+  ## CALENDAR OVERVIEW
+  - Day-by-day view of scheduled events for the next 5 days
+  ```
+
+  For EVERY item, include: source, clickable link, due date in Pacific Time, submission status.
+
+  **Linking rules:**
+  - Every referenced item MUST have a clickable link. No exceptions.
+  - Canvas assignments/announcements: use `html_url` from the API response
+  - EdStem threads: `https://edstem.org/us/courses/{courseId}/discussion/{threadId}`
+  - Email: link to Gmail web UI if message ID is available
+  - Calendar events: link to Google Calendar event URL if available
+  - If a link is unavailable, explicitly say "(no link available)" — never silently omit it
+
+  ### Courses
+
+  Configure your Canvas and Ed course IDs in `functions.ts` after discovering them
+  via `readable_myCourses()` from the canvas and edstem skills.
+
+  ### Functions
+
+  - `readable_academicBrief()` — combined Canvas + EdStem + email briefing (parallel fetch)
+  - `raw_canvasBrief()` — Canvas data only (todo, missing, assignments, announcements, submissions)
+  - `raw_edBrief()` — EdStem data only (recent threads, keyword search across active courses)
+  - `raw_schoolEmail()` — Email inbox summary

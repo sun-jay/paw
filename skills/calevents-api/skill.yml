@@ -1,0 +1,59 @@
+name: calevents-api
+version: 1
+secrets: {}
+skill_dependencies: []
+
+docs: |
+  ## CalEvents API (calevents.app)
+
+  Access UC Berkeley club events via the calevents.app Next.js server action API.
+  No authentication required — all endpoints are public.
+
+  Trigger on: Berkeley events, campus events, club events, what's happening at Cal,
+  upcoming events, "calevents", "any events this week", club activities.
+
+  ### How It Works
+
+  The API uses Next.js Server Actions via POST to `https://www.calevents.app/`.
+  Responses are in RSC flight format — JSON payload is on the `1:` record line.
+
+  Required headers: `Accept: text/x-component`, `Next-Action: <action-id>`
+  Parameters: multipart form fields `1_$ACTION_ID_<id>=` (empty) and `0=<JSON args>`
+
+  ### Functions
+
+  #### Raw (return parsed JSON)
+
+  - `raw_getEventsCursor(opts?)` — paginated events. opts: `{ cursor, direction, limit }`
+    - cursor: null (first page) or `{ date, createdAt }` from previous nextCursor
+    - direction: "future" (default) or "past"
+    - limit: number (default 50)
+    - Returns: `{ events, hasMore, nextCursor }`
+  - `raw_getEvents()` — all events (~2700+, ~5MB). Use sparingly.
+  - `raw_getEventById(eventId)` — single event by UUID
+  - `raw_getAccountsWithEventCounts()` — club directory with event counts
+  - `raw_getClubsForDirectory()` — club listing
+
+  #### Readable (return condensed markdown)
+
+  - `readable_upcomingEvents(limit?)` — upcoming events formatted with links
+  - `readable_searchEvents(query, limit?)` — search events by keyword, return matches
+  - `readable_clubDirectory()` — list clubs with event counts
+
+  ### Event Link Format
+
+  Always link events: `https://www.calevents.app/events?event={events_id}`
+
+  ### Event Object Fields
+
+  events_id, club_username, collaborator_clubs, title, description, date,
+  start_time, end_time, location, link, event_type, invite_type, created_at,
+  source_posts, media_items, google_calendar_url
+
+  ### Action IDs (may change on redeploy)
+
+  - getEventsCursor: `401c0e0dfc59bb54ebd1f5552b818e5c25470e4e94`
+  - getEvents: `4032696f58d6087744e15a74dbeb91eb0a67e51d1b`
+  - getEventById: `40d3ab02ee13af663bef55b38ea8c13145ba5b060b`
+  - getAccountsWithEventCounts: `001ccc61eeae9e12d9d70bd76024dbccc3cfba984b`
+  - getClubsForDirectory: `00573be2de8aa4203536f3755e43543ce387253c16`
