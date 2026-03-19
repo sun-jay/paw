@@ -1,0 +1,71 @@
+name: gws-mail
+version: 2
+secrets:
+  GWS_CLIENT_ID: op://paw_vault/GWS-CLI/client_id
+  GWS_CLIENT_SECRET: op://paw_vault/GWS-CLI/client_secret
+  GWS_REFRESH_TOKEN: op://paw_vault/GWS-CLI/refresh_token
+skill_dependencies: []
+
+docs: |
+  ## GWS Mail — Google Workspace Email
+
+  Gmail integration via the Google Workspace CLI (`gws`).
+  Also supports Calendar access for the same account.
+
+  ### Prerequisites
+
+  - `gws` CLI installed globally: `bun install -g @googleworkspace/cli` (v0.13.2+)
+  - `gcloud` CLI installed: `brew install --cask google-cloud-sdk`
+  - GCP project with OAuth consent screen configured
+  - OAuth client type: Desktop app, created in Google Cloud Console
+  - Credentials stored in 1Password item `GWS-CLI` with fields: client_id, client_secret, refresh_token
+
+  ### Initial Setup
+
+  1. Create a GCP project in Google Cloud Console
+  2. Configure OAuth consent screen (add your email as a test user)
+  3. Create an OAuth Desktop client in Console
+  4. Download `client_secret_*.json` → place at `~/.config/gws/client_secret.json`
+  5. Run `gws auth login -s gmail,calendar` → authenticate with your account
+  6. Export credentials via `gws auth export --unmasked`
+  7. Store client_id, client_secret, refresh_token in 1Password vault
+
+  ### Re-auth (if token expires)
+
+  If the refresh token is revoked or expired:
+  ```bash
+  gws auth login -s gmail,calendar
+  gws auth export --unmasked  # get new refresh_token
+  # update 1Password: op item edit GWS-CLI refresh_token=<new_token>
+  ```
+
+  ### OAuth Scopes
+
+  - `https://www.googleapis.com/auth/gmail.modify` — read/send/label Gmail
+  - `https://www.googleapis.com/auth/calendar` — full Calendar access
+  - `openid` + `userinfo.email` — identity
+
+  ### When to use
+
+  Trigger on: email, inbox, "check my email", "any new emails", "email from ...",
+  "send email", calendar, class schedule.
+
+  ### Functions
+
+  #### Raw (return parsed JSON)
+
+  - `raw_triage()` — unread inbox summary (sender, subject, date, id)
+  - `raw_getMessage(messageId)` — full message content
+  - `raw_searchMessages(query)` — search Gmail with query string
+  - `raw_listLabels()` — all Gmail labels
+  - `raw_send(to, subject, body)` — send an email
+  - `raw_reply(messageId, body)` — reply to a message
+  - `raw_calendarList(timeMin?, timeMax?)` — calendar events
+
+  #### Readable (return condensed markdown)
+
+  - `readable_triage()` — formatted inbox summary
+  - `readable_getMessage(messageId)` — formatted single message
+  - `readable_searchMessages(query)` — formatted search results
+  - `readable_send(to, subject, body)` — send and confirm
+  - `readable_calendarToday()` — today's calendar events

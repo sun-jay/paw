@@ -1,0 +1,69 @@
+name: canvas
+version: 1
+secrets:
+  CANVAS_API_TOKEN: op://paw_vault/Canvas/credential
+skill_dependencies: []
+
+docs: |
+  ## Canvas LMS
+
+  Integration with Canvas LMS REST API for course data, assignments, grades, submissions,
+  announcements, modules, files, and discussions.
+
+  API base: Set via `CANVAS_BASE_URL` env var, or defaults to `https://canvas.instructure.com/api/v1`
+  Timezone: America/Los_Angeles
+
+  ### When to use
+
+  Trigger on: school, homework, assignments, due dates, grades, courses, Canvas,
+  "what do I have to do", "morning check", "what's due", "plan my week", "weekly check",
+  "course status", "missing submissions", or any mention of specific courses.
+
+  ### Courses
+
+  Configure your course IDs here after running `readable_myCourses()` to discover them.
+
+  | Course                                | Canvas ID  | Code             |
+  |---------------------------------------|------------|------------------|
+  | Example Course                        | 123456     | COURSE 101       |
+
+  ### Functions
+
+  #### Raw (return API JSON)
+
+  - `raw_getProfile()` — authenticated user profile
+  - `raw_getTodo()` — to-do items (upcoming work)
+  - `raw_getUpcomingEvents()` — upcoming events/assignments
+  - `raw_getMissingSubmissions()` — missing/overdue submissions
+  - `raw_getGrades()` — enrollments with grades across all courses
+  - `raw_getCourses()` — list active courses
+  - `raw_getDashboard()` — dashboard cards overview
+  - `raw_getAssignments(courseId)` — list assignments for a course
+  - `raw_getAssignment(courseId, assignmentId)` — single assignment details
+  - `raw_getSubmission(courseId, assignmentId)` — your submission status
+  - `raw_getAnnouncements(courseIds)` — announcements for given courses
+  - `raw_getModules(courseId)` — modules with items
+  - `raw_getFiles(courseId, searchTerm?)` — course files, optional search
+  - `raw_getDiscussionTopics(courseId)` — discussion topics
+
+  #### Readable (return condensed markdown)
+
+  - `readable_myCourses()` — list enrolled courses with IDs
+  - `readable_todo()` — upcoming to-do items with links
+  - `readable_missingSubmissions()` — missing/overdue work with links
+  - `readable_weeklyPlan()` — prioritized weekly plan: assignments, grades, submissions
+  - `readable_dailyBrief()` — daily overview: todo + upcoming + missing + recent announcements
+  - `readable_courseAssignments(courseId)` — assignments for a course with due dates and status
+  - `readable_announcements(courseIds?)` — recent announcements across courses
+
+  ### Link Format
+
+  Assignment links: `{CANVAS_BASE_URL}/courses/{courseId}/assignments/{assignmentId}`
+  Course links: `{CANVAS_BASE_URL}/courses/{courseId}`
+  File viewer links: use `display_url` or HTML URL, NOT direct download URLs.
+
+  ### User Preferences
+
+  - Every actionable item must include a direct, openable link
+  - Dates: convert from UTC to Pacific Time for display
+  - Pagination: always use `per_page=50`, check Link header for `rel="next"`
