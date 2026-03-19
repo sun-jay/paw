@@ -16,9 +16,9 @@ Here's what's broken, and how I fixed it.
 
 ---
 
-## Problem 1: Skills Are Just Prompts
+## What a Skill Actually Is (And What Anthropic Thinks It Is)
 
-An Anthropic skill is a markdown file. That's it. `SKILL.md` contains YAML frontmatter and instructions that get injected into Claude's context when invoked.
+Anthropic thinks a skill is a markdown file. `SKILL.md` — YAML frontmatter plus instructions, injected into Claude's context when invoked.
 
 ```yaml
 ---
@@ -30,7 +30,29 @@ allowed-tools: Bash(npm run deploy)
 To deploy, run `npm run deploy` and verify the health check...
 ```
 
-This is fine for "tell Claude how to do X" use cases. But a *real* skill — one that integrates with external services — needs more than instructions. It needs **executable logic**.
+That's not a skill. That's a prompt with metadata.
+
+A real skill — one that integrates with external services, handles credentials safely, and improves over time — has **three components**:
+
+```
+skills/canvas/
+├── skill.yml        # docs + secrets + metadata
+└── functions.ts     # executable logic
+```
+
+**1. Functions** — typed, executable code that does the actual work. Not instructions for Claude to interpret. Not bash commands for Claude to generate. Real functions with real error handling.
+
+**2. Docs** — instructions and context that Claude reads to understand *when* and *how* to use the functions. This is the part Anthropic got right.
+
+**3. Secrets** — declarative references to credentials, loaded only when the skill is activated, never sent to Anthropic's servers.
+
+Anthropic ships component 2 and calls it done. Here's why the other two matter more than you think.
+
+---
+
+## Problem 1: Skills Can't Do Anything
+
+An Anthropic skill tells Claude *about* an API. A PAW skill *calls* the API. The difference is enormous.
 
 Consider an EdStem integration. You need to:
 - Authenticate with OAuth tokens
@@ -43,18 +65,10 @@ You can't prompt-engineer your way through pagination logic. You need code.
 
 ### The Fix: Two-Layer Function Architecture
 
-In PAW (Personal Agent Workspace), every skill has an optional `functions.ts` alongside its config:
-
-```
-skills/edstem/
-├── skill.yml
-└── functions.ts
-```
-
-Functions follow a two-layer pattern:
+PAW functions follow a `raw_*` / `readable_*` pattern:
 
 ```typescript
-// Layer 1: Raw API access — returns Promise<any>
+// Layer 1: Raw — returns structured JSON for programmatic use
 export async function raw_listThreads(courseId: number): Promise<any> {
   const res = await fetch(`https://edstem.org/api/courses/${courseId}/threads`, {
     headers: { Authorization: `Bearer ${token()}` },
@@ -62,7 +76,7 @@ export async function raw_listThreads(courseId: number): Promise<any> {
   return res.json();
 }
 
-// Layer 2: Readable output — returns Promise<string>
+// Layer 2: Readable — returns markdown string, saves tokens
 export async function readable_listThreads(courseId: number): Promise<string> {
   const data = await raw_listThreads(courseId);
   return data.threads
@@ -71,11 +85,21 @@ export async function readable_listThreads(courseId: number): Promise<string> {
 }
 ```
 
-**Why two layers?** Because sometimes the agent needs structured data for further processing (`raw_*`), and sometimes it needs human-readable output for a conversation (`readable_*`). Anthropic's approach forces everything through natural language — Claude reads instructions, generates bash commands or API calls, and hopes for the best. That's fine for `git log`. It's not fine for a 14-endpoint API integration with pagination, auth, and error handling.
+**Why two layers?** Because dumping raw JSON into Claude's context is a waste of tokens. The `readable_*` layer pre-formats API responses into concise markdown — Claude gets exactly what it needs to answer the user, nothing more. When the agent needs structured data for further processing (filtering, sorting, piping into another function), it calls `raw_*` instead.
+
+Anthropic's approach forces everything through natural language — Claude reads instructions, generates bash commands or API calls, and hopes for the best. That's fine for `git log`. It's not fine for a 14-endpoint API integration with pagination, auth, and error handling.
+
+### The Self-Refining Loop
+
+Here's the part that makes this architecture compound: **Claude can fix its own skills.**
+
+When a `readable_*` function returns garbled output, or a `raw_*` function hits an unexpected API change, Claude doesn't just work around it — it opens `functions.ts`, fixes the bug, bumps the `version` in `skill.yml`, and updates the docs if signatures changed. The next invocation uses the fixed code.
+
+Anthropic skills can't do this. A `SKILL.md` is a static document. If the instructions are wrong, Claude follows them anyway and fails. There's no feedback loop. The skill doesn't get better with use — it gets stale.
 
 ---
 
-## Problem 2: No Secret Management
+## Problem 2: No Secret Management (And a Security Nightmare)
 
 This one is almost embarrassing. Anthropic's skill system has **zero built-in secret management**. If your skill needs an API key, you either:
 
@@ -83,9 +107,13 @@ This one is almost embarrassing. Anthropic's skill system has **zero built-in se
 2. Reference an environment variable and hope it's set
 3. Tell Claude to ask the user for it
 
-None of these are real solutions. Option 2 means every developer on the team needs to manually configure the same env vars. Option 3 means Claude asks for your API key every session.
+None of these are real solutions. But the real problem is worse than inconvenience — it's a **security architecture failure**.
 
-### The Fix: Declarative Secrets with 1Password
+When you put secrets in environment variables or `.env` files, they're available to *every* tool Claude uses for the *entire* session. Claude can access your GitHub token when it's supposed to be querying Canvas. It can read your email credentials when it's supposed to be checking assignments. There's no isolation, no least-privilege, no revocation path.
+
+And here's the part nobody talks about: those secrets flow through Anthropic's API in tool calls. Every `Bash` command Claude runs gets sent to Anthropic's servers as part of the conversation. If your env var contains `GITHUB_TOKEN=ghp_xxxx` and Claude runs `echo $GITHUB_TOKEN` (or even `env | grep TOKEN`), that secret is now in Anthropic's logs.
+
+### The Fix: Least-Privilege Secrets with Remote Revocation
 
 In PAW, every skill declares its secrets in the frontmatter:
 
@@ -97,7 +125,7 @@ secrets:
 skill_dependencies: []
 ```
 
-The `op://` references point to 1Password items. When a skill is activated, the `secretsmanager` bootstrap skill resolves every secret via `op read`, injects them into `process.env`, and the skill's functions access them normally.
+The `op://` references point to 1Password items. When — and *only* when — Claude activates that specific skill, the `secretsmanager` bootstrap skill resolves its secrets via `op read` and injects them into the runtime.
 
 ```typescript
 function token(): string {
@@ -107,13 +135,17 @@ function token(): string {
 }
 ```
 
-**Key properties:**
-- **Single source of truth**: Secrets live in 1Password, not in `.env` files scattered across machines
-- **Lazy injection**: Only secrets for activated skills (and their dependencies) are loaded
-- **No exposure**: The agent can create and list secrets but never log or print values
-- **One bootstrap secret**: Only `OP_SERVICE_ACCOUNT_TOKEN` lives in `.env` — everything else flows through 1Password
+This gives you **least-privilege by default**: Claude can't touch your Gmail credentials when it's doing Canvas work, because those secrets aren't loaded until the Gmail skill is explicitly activated. But the security properties go deeper:
 
-Anthropic could ship this tomorrow. MCP servers already have credential configuration in `settings.json`. Extending that pattern to skills is straightforward.
+**Secrets never reach Anthropic.** The `op read` call happens locally. The resolved value goes into `process.env` on the local machine. When `functions.ts` makes an API call, it reads the token from the local environment and sends it directly to the target API (Canvas, EdStem, Gmail). The secret never appears in a tool call, never gets sent to Anthropic's servers, never enters the conversation context. The only way it leaks is if Claude deliberately runs a command to print it — and that's a visible, auditable action the user can catch.
+
+**Any individual secret can be rotated remotely.** If your Canvas API token is compromised, you rotate it in 1Password. The next time the skill activates, `op read` pulls the new value. No redeployment. No `.env` file updates. No SSH-ing into machines.
+
+**Any individual secret can be revoked instantly.** Delete the 1Password item or remove the agent's access to it. The next activation fails cleanly with a clear error. You've surgically removed one capability without touching anything else.
+
+**The agent's master key is revocable too.** The only secret that lives in `.env` is `OP_SERVICE_ACCOUNT_TOKEN` — the 1Password service account token that bootstraps everything else. Revoke or rotate this one token and the agent loses access to *all* secrets simultaneously. It's a kill switch for the entire credential chain.
+
+This is the security model that agents need: **layered, granular, remotely revocable, with secrets that never transit through the AI provider.** Anthropic could ship this. They already have credential configuration for MCP servers in `settings.json`. Extending that pattern to skills is straightforward.
 
 ---
 
@@ -212,15 +244,19 @@ But skills-as-prompts break down the moment you want to build a **personal agent
 
 | Capability | Anthropic Skills | PAW Skills |
 |---|---|---|
-| Instructions for Claude | SKILL.md (markdown) | skill.yml `docs` field |
-| Executable logic | None (Claude generates commands) | `functions.ts` (typed TypeScript) |
-| Secret management | Manual env vars | Declarative 1Password references |
-| Dependencies | None | Recursive depth-first resolution |
+| Skill anatomy | Markdown file (prompts only) | Functions + Docs + Secrets |
+| Executable logic | None (Claude generates commands) | `functions.ts` with `raw_*` + `readable_*` layers |
+| Token efficiency | Raw JSON dumped into context | `readable_*` pre-formats to concise markdown |
+| Self-improvement | Static — skill never changes | Claude fixes functions & docs as it uses them |
+| Secret management | Env vars (always loaded, visible) | Declarative 1Password (loaded per-skill) |
+| Secret isolation | All secrets available all the time | Least-privilege — only activated skill's secrets load |
+| Secrets reach AI provider? | Yes (via tool calls and context) | No — resolved locally, sent directly to target API |
+| Secret revocation | Manual `.env` edits on every machine | Remote rotation/revocation per-secret from 1Password |
+| Agent kill switch | None | Revoke `OP_SERVICE_ACCOUNT_TOKEN` |
+| Dependencies | None | Recursive depth-first resolution with dedup |
 | Versioning | None | `version` field in frontmatter |
 | Scheduled execution | `/loop` (requires active session) | launchd + headless Claude sessions |
 | State persistence | None | Structured memory system |
-| Error handling | Claude retries (or doesn't) | Typed catch-and-return patterns |
-| Function architecture | N/A | `raw_*` + `readable_*` two-layer |
 
 ---
 
