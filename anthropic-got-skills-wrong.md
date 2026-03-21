@@ -4,6 +4,8 @@
 
 **Anthropic's solution:** Skills. Literally just a .MD file that contains instructions, docs, and code snippets. Theoretically, this is all you need to use a CLI or hit a REST API with curl. In practice, this is an oversimplification.
 
+![Provide a caption (optional)]()
+
 **Why Anthropic's skills fall short:**
 
 1. NO SECRETS MANAGEMENT. I found myself just pasting API keys into the skill itself to hastily make things work. This is the WORST security model: no revocation, no rotation, stagnant plaintext storage, and worst of all, you send your keys in plaintext to Anthropic.
@@ -59,8 +61,6 @@ The other parts of the .yml are explained below.
 
 PAW skills let the LLM manage its own small code library (a .ts file) associated with a skill, complete with type checking, saved procedures, reusable constructs, instant execution (no need to generate the code as output tokens), and all the other reasons humans use .ts files instead of .md files.
 
-### Two layers: `raw_*` and `readable_*`
-
 To further optimize the performance and allow the LLM to synergize with the code, we instruct LLMs to write PAW skills with 2 layers of data processing:
 
 1. `raw_*` — for when the agent needs structured data for further processing (filtering, joining, sorting, composing with another function from a different skill, etc.)
@@ -68,32 +68,18 @@ To further optimize the performance and allow the LLM to synergize with the code
 
 **Key advantage:** A raw Canvas Assignments API response is ~6.2KB of nested JSON. The `readable_*` output is ~0.2KB of clean markdown with links. That's roughly a **31x reduction** in context consumed.
 
-```typescript
-// skills/canvas/functions.ts
+```bash
+$ raw_getAssignments("1552931")   # STAT 135
+{ "id": 9041823, "name": "Homework 5", "due_at": "2026-03-20T04:59:00Z",
+  "course_id": 1552931, "submission_types": ["online_upload"],
+  "allowed_extensions": ["pdf","zip"], "locked_for_user": false,
+  # ... 25 more fields × 12 assignments = 6,247 bytes }
 
-// raw_* — returns structured JSON, one function per API endpoint
-export async function raw_getAssignments(courseId: number): Promise<any[]> {
-  return apiAll(`/courses/${courseId}/assignments`, {
-    order_by: "due_at",
-  });
-}
-
-// readable_* — returns condensed markdown, composes raw_* calls
-export async function readable_courseAssignments(courseId: number): Promise<string> {
-  const assignments = await raw_getAssignments(courseId);
-  if (assignments.length === 0) return "No assignments found for this course.";
-
-  const now = new Date();
-  const upcoming = assignments.filter((a: any) => a.due_at && new Date(a.due_at) >= now);
-  const past = assignments.filter((a: any) => !a.due_at || new Date(a.due_at) < now);
-
-  const lines = [`## Assignments (${assignments.length} total)`, ""];
-  // a bunch more md construction
-  return lines.join("\n");
-}
+$ readable_courseAssignments("1552931")
+## STAT 135 — Assignments                          # 198 bytes (31x smaller)
+- **Homework 5** — due Fri Mar 20 — ⚠️ not submitted — [link](https://bcourses...)
+- **Lab 4** — due Fri Mar 21 — ✅ submitted — [link](...)
 ```
-
-### Self-refining skills
 
 Agents in PAW are encouraged to fix, lint, and test their own code/skills and utilize version control to keep track of the patches.
 
@@ -101,7 +87,7 @@ Agents in PAW are encouraged to fix, lint, and test their own code/skills and ut
 
 Anthropic's skill system has **zero built-in secret management**. If your skill needs an API key, you hardcode it, set an env var, or tell Claude to ask the user. All three are broken for the age of highly privileged autonomous agents. Luckily, the 1password CLI with a scoped vault gives us most of the functionality we need for proper secrets management.
 
-In PAW, skills are **directly** associated with their secrets; declared in their frontmatter as references to 1Password.
+In PAW, skills are **directly** associated with their secrets; declared in their frontmatter as references to 1Password:
 
 ```yaml
 # skills/canvas/skill.yml
@@ -110,28 +96,17 @@ secrets:
   CANVAS_API_TOKEN: op://paw_vault/Canvas/credential
 ```
 
-When the agent activates a skill, `secretsmanager` injects that skill's secrets into the environment. The LLM doesn't worry about 1pass, and never views a single secret - the LLM focuses ONLY on its logic and achieving the user's goal.
+The agent activates a skill using the built-in default skill `secretsmanager`, which injects that skill's secrets into the environment. The LLM doesn't worry about 1pass, and never views a single secret - the LLM focuses ONLY on its logic and achieving the user's goal:
 
-```typescript
-// skills/secretsmanager/functions.ts
-export function resolveSecrets(secretsMap: Record<string, string>): string[] {
-  const entries = Object.entries(secretsMap).filter(
-    ([, ref]) => ref.startsWith("op://")
-  );
-  const injected: string[] = [];
-  for (const [envName, opRef] of entries) {
-    const value = execSync(`op read "${opRef}"`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-    process.env[envName] = value;
-    injected.push(envName);
-  }
-  return injected;
-}
+```bash
+$ bun run -e 'import { activate } from "./skills/secretsmanager/functions.ts"; console.log((await activate("canvas")).summary)'
+✓ Activated: canvas (v1)
+  Secrets injected: CANVAS_API_TOKEN
+  Available functions: [ raw_getAssignments, readable_weeklyPlan, ... ] # 21 total
+# LLM is free to use these functions or execute custom typescript transformations
 ```
 
-This architecture gives you **four** vital security properties that Anthropic's approach doesn't:
+This architecture gives you four vital security properties:
 
 ### 3a. Secrets never reach Anthropic
 
@@ -141,11 +116,11 @@ This architecture gives you **four** vital security properties that Anthropic's 
 
 - Each skill declares **only** the secrets it needs
 - Secrets are injected only when that specific skill is activated and can be removed from context upon deactivation
-- With Anthropic's approach, even in the ideal case where you use a .env, all env vars are available to all tools for the entire session. One moment your agent is on Reddit, the next, it has been prompt injected into revealing your Gmail credentials — not with PAW
+- With Anthropic's approach, even in the ideal case where you use a .env, all env vars are available to all tools for the entire session - no scoping. One moment your agent is on Reddit, the next, it has been prompt injected into revealing your Gmail credentials? - not with PAW
 
 ### 3c. Granular rotation and revocation
 
-- I cannot overstate how important this is: ***1password grants instant remote revocation or rotation of any secret, including the master vault key***
+- I cannot overstate how important this is: 1password grants instant remote revocation or rotation of any secret, including the master vault key
 
 ### 3d. Kill switch
 
